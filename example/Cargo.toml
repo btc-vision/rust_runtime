@@ -1,0 +1,17 @@
+[package]
+name = "example"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib"]
+
+[profile.release]
+strip = true
+
+[dependencies]
+rust_runtime = {path="../"}
+hex = "0.4.3"
+wasm_allocator = "0.1.1"
+
+[features]
