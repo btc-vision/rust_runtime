@@ -6,7 +6,7 @@
 ## Compilation
 ```sh
 cargo build --release -p example
-wasm-opt -O2 -Oz ../target/wasm32-unknown-unknown/release/example.wasm -o ./rust.wasm
+wasm-opt -O2 -Oz --strip-debug --strip-dwarf --dce ../target/wasm32-unknown-unknown/release/example.wasm -o ./rust.wasm
 ```
 
 ## Testing

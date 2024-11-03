@@ -6,6 +6,11 @@ edition = "2021"
 [workspace]
 members = ["example"]
 
+[profile.release]
+opt-level = "z" # or "s" for size-speed balance
+lto = true # Link Time Optimization for smaller binary
+codegen-units = 1 # Ensures code is optimized across the board
+panic = "abort" # Avoids including panic runtime support
 
 [dependencies]
 
