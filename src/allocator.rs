@@ -1,5 +1,5 @@
 use core::slice;
-use std::{alloc::System, io::Write};
+use alloc::alloc::{alloc, alloc_zeroed, Layout, GlobalAlloc, dealloc, realloc};
 
 pub struct WaAllocator;
 
@@ -14,56 +14,57 @@ pub struct WaCell {
 }
 
 impl WaAllocator {
-    fn layout(layout: std::alloc::Layout) -> std::alloc::Layout {
+    fn layout(layout: Layout) -> Layout {
         unsafe {
-            std::alloc::Layout::from_size_align_unchecked(
-                layout.size() + std::mem::size_of::<WaCell>(),
+            Layout::from_size_align_unchecked(
+                layout.size() + size_of::<WaCell>(),
                 layout.align(),
             )
         }
     }
     unsafe fn write_header(ptr: *mut u8, id: u32, size: usize) {
-        slice::from_raw_parts_mut(ptr, 4)
-            .write(&id.to_le_bytes())
-            .unwrap();
-        slice::from_raw_parts_mut(ptr.wrapping_add(4), 4)
-            .write(&(size as u32).to_le_bytes())
-            .unwrap();
+        // Write the `id` as little-endian bytes into the first 4 bytes
+        slice::from_raw_parts_mut(ptr, 4).copy_from_slice(&id.to_le_bytes());
+
+        // Write the `size` (cast to u32) as little-endian bytes into the next 4 bytes
+        slice::from_raw_parts_mut(ptr.add(4), 4).copy_from_slice(&(size as u32).to_le_bytes());
     }
 }
 
-unsafe impl std::alloc::GlobalAlloc for WaAllocator {
-    unsafe fn alloc(&self, layout: std::alloc::Layout) -> *mut u8 {
+unsafe impl GlobalAlloc for WaAllocator {
+    unsafe fn alloc(&self, layout: Layout) -> *mut u8 {
         let size = layout.size();
         let layout = WaAllocator::layout(layout);
-        let ptr = System.alloc(layout);
+        let ptr = alloc(layout);
         WaAllocator::write_header(ptr, 1, size);
 
-        ptr.wrapping_add(std::mem::size_of::<WaCell>())
+        ptr.wrapping_add(size_of::<WaCell>())
     }
 
-    unsafe fn alloc_zeroed(&self, layout: std::alloc::Layout) -> *mut u8 {
+    unsafe fn dealloc(&self, ptr: *mut u8, layout: Layout) {
+        let layout = WaAllocator::layout(layout);
+        dealloc(ptr.wrapping_sub(size_of::<WaCell>()), layout);
+    }
+
+    unsafe fn alloc_zeroed(&self, layout: Layout) -> *mut u8 {
         let size = layout.size();
         let layout = WaAllocator::layout(layout);
-        let ptr = System.alloc_zeroed(layout);
+        let ptr = alloc_zeroed(layout);
         WaAllocator::write_header(ptr, 1, size);
 
-        ptr.wrapping_add(std::mem::size_of::<WaCell>())
+        ptr.wrapping_add(size_of::<WaCell>())
     }
 
-    unsafe fn dealloc(&self, ptr: *mut u8, layout: std::alloc::Layout) {
+    unsafe fn realloc(&self, ptr: *mut u8, layout: Layout, new_size: usize) -> *mut u8 {
         let layout = WaAllocator::layout(layout);
-        System.dealloc(ptr.wrapping_sub(std::mem::size_of::<WaCell>()), layout);
-    }
-
-    unsafe fn realloc(&self, ptr: *mut u8, layout: std::alloc::Layout, new_size: usize) -> *mut u8 {
-        let layout = WaAllocator::layout(layout);
-        System
-            .realloc(
-                ptr.wrapping_sub(std::mem::size_of::<WaCell>()),
+        realloc(
+                ptr.wrapping_sub(size_of::<WaCell>()),
                 layout,
-                new_size + std::mem::size_of::<WaCell>(),
+                new_size + size_of::<WaCell>(),
             )
-            .wrapping_add(std::mem::size_of::<WaCell>())
+            .wrapping_add(size_of::<WaCell>())
     }
 }
+
+#[global_allocator]
+static GLOBAL: WaAllocator = WaAllocator;

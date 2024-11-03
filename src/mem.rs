@@ -1,11 +1,16 @@
 use core::slice;
-use std::{alloc::Layout, io::Write, mem, ptr};
+
+use alloc::boxed::Box;
+use alloc::vec::Vec;
+use core::mem;
+use alloc::alloc::{alloc, Layout, dealloc};
+use alloc::{format}; // Import format and String from alloc
 
 extern crate alloc;
 
-static mut MEMORY: Vec<WaPtr> = Vec::new();
-
 pub type WaPtr = u32;
+
+static mut MEMORY: Vec<WaPtr> = Vec::new();
 
 pub struct Cursor<'a> {
     inner: &'a [u8],
@@ -51,13 +56,13 @@ impl WaCell {
     const fn usize() -> usize {
         mem::size_of::<WaCell>()
     }
-    const fn layout(size: usize) -> std::alloc::Layout {
-        unsafe { std::alloc::Layout::from_size_align_unchecked(size + WaCell::usize(), 1) }
+    const fn layout(size: usize) -> Layout {
+        unsafe { Layout::from_size_align_unchecked(size + WaCell::usize(), 1) }
     }
     pub fn new(size: usize, id: u32) -> Box<WaCell> {
         unsafe {
             let layout = WaCell::layout(size);
-            let ptr = std::alloc::alloc(layout);
+            let ptr = alloc(layout);
             let mut cell = Box::<WaCell>::from_raw(ptr.cast());
             cell.gc_info1 = 0;
             cell.mm_info = ptr as usize;
@@ -69,7 +74,7 @@ impl WaCell {
 
     pub fn new_data(id: u32, data: &[u8]) -> Box<WaCell> {
         let mut cell = WaCell::new(data.len(), id);
-        cell.data_mut().write(data).unwrap();
+        cell.data_mut().copy_from_slice(data); // Use `copy_from_slice` instead of `write`
         cell
     }
 
@@ -86,7 +91,7 @@ impl WaCell {
                 if let Some(index) = MEMORY.iter().position(|cell_ptr| *cell_ptr == ptr) {
                     MEMORY.remove(index);
                 }
-                std::alloc::dealloc(Box::into_raw(self) as *mut u8, layout);
+                dealloc(Box::into_raw(self) as *mut u8, layout);
             }
         } else {
             self.dec();
@@ -275,11 +280,9 @@ pub fn new(size: usize, id: u32) -> WaPtr {
 #[no_mangle]
 #[export_name = "__pin"]
 pub fn pin(ptr: WaPtr) -> WaPtr {
-    unsafe {
-        let mut cell = WaCell::from_raw(ptr);
-        cell.inc();
-        cell.to_raw()
-    }
+    let mut cell = WaCell::from_raw(ptr);
+    cell.inc();
+    cell.to_raw()
 }
 
 #[no_mangle]
@@ -307,6 +310,7 @@ pub fn collect() {
                 new.push(cell.to_raw());
             }
         }
-        MEMORY = new
+        MEMORY.clear(); // Clear the old memory
+        MEMORY.extend(new); // Update with the new elements
     }
 }

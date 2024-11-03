@@ -7,14 +7,14 @@ edition = "2021"
 crate-type = ["cdylib"]
 
 [profile.release]
-opt-level = "z" # or "s" for size-speed balance
+opt-level = "s" # or "s" for size-speed balance
 lto = true # Link Time Optimization for smaller binary
 codegen-units = 1 # Ensures code is optimized across the board
 panic = "abort" # Avoids including panic runtime support
 strip = true
 
 [dependencies]
-rust_runtime = {path="../"}
+rust_runtime = {path=".."}
 hex = "0.4.3"
 wasm_allocator = "0.1.1"
 
