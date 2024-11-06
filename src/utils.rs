@@ -13,14 +13,14 @@ pub fn to_hex(bytes: &[u8]) -> alloc::string::String {
     string
 }
 pub trait ToHex {
-    fn get_bytes<'a>(&'a self) -> &'a [u8];
-    fn to_hex<'a>(&'a self) -> alloc::string::String {
+    fn get_bytes(&self) -> &[u8];
+    fn to_hex(&self) -> alloc::string::String {
         to_hex(self.get_bytes())
     }
 }
 
 impl ToHex for &[u8] {
-    fn get_bytes<'a>(&'a self) -> &'a [u8] {
+    fn get_bytes(&self) -> &[u8] {
         self
     }
 }
@@ -31,7 +31,7 @@ mod tests {
 
     pub struct TestHex(alloc::vec::Vec<u8>);
     impl ToHex for TestHex {
-        fn get_bytes<'a>(&'a self) -> &'a [u8] {
+        fn get_bytes(&self) -> &[u8] {
             &self.0
         }
     }

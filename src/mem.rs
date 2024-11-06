@@ -1,36 +1,11 @@
 use alloc::alloc::{alloc, Layout};
 use alloc::slice;
-use alloc::string::String;
-use core::ptr::NonNull; // Import format and String from alloc
+use core::ptr::NonNull;
+use core::str::FromStr; // Import format and String from alloc
 
 extern crate alloc;
 
 pub type WaPtr = u32;
-
-pub struct Cursor {
-    inner: &'static [u8],
-    pos: usize,
-}
-
-impl Cursor {
-    pub const fn new(inner: &'static [u8]) -> Cursor {
-        Cursor { pos: 0, inner }
-    }
-
-    pub fn into_inner(self) -> &'static [u8] {
-        self.inner
-    }
-
-    pub const fn position(&self) -> usize {
-        self.pos
-    }
-
-    pub fn read_u32(&mut self) -> u32 {
-        let result = u32::from_le_bytes(self.inner[self.pos..self.pos + 4].try_into().unwrap());
-        self.pos += 4;
-        result
-    }
-}
 
 pub struct WaCell {
     pub mm_info: usize,
@@ -86,8 +61,8 @@ impl WaCell {
         unsafe { slice::from_raw_parts_mut(self.ptr() as *mut u8, self.rt_size as usize) }
     }
 
-    pub fn cursor(&mut self) -> Cursor {
-        Cursor::new(self.data_mut())
+    pub fn cursor(&mut self) -> super::cursor::Cursor {
+        super::cursor::Cursor::new(self.data_mut())
     }
 }
 
@@ -110,17 +85,6 @@ impl WaBuffer {
         );
         WaBuffer { pointer, buffer }
     }
-    pub fn from_str(s: &str) -> WaBuffer {
-        let len = (s.chars().count()) as u16;
-        let str_data = len
-            .to_le_bytes()
-            .iter()
-            .chain(s.as_bytes())
-            .cloned()
-            .collect::<alloc::vec::Vec<u8>>();
-        WaBuffer::from_bytes(&str_data)
-    }
-
     pub fn from_raw(ptr: WaPtr) -> WaBuffer {
         let pointer = WaCell::from_raw(ptr);
         let mut cursor = pointer.cursor();
@@ -137,10 +101,10 @@ impl WaBuffer {
         self.buffer.data()
     }
 
-    /*
-    Cast memory to given Type.
-    It is very unsafe and works only on WASM32 arch due to memory align and type sizes
-     */
+    /// # Safety
+    ///
+    /// Cast memory to given Type.
+    /// It is very unsafe and works only on WASM32 arch due to memory align and type sizes
     #[cfg(target_arch = "wasm32")]
     pub unsafe fn into_type<T: Sized>(&self) -> &'static mut T {
         if core::mem::size_of::<T>() <= self.buffer.rt_size as usize {
@@ -150,3 +114,33 @@ impl WaBuffer {
         }
     }
 }
+
+impl FromStr for WaBuffer {
+    type Err = u8;
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let len = (s.chars().count()) as u16;
+        let str_data = len
+            .to_le_bytes()
+            .iter()
+            .chain(s.as_bytes())
+            .cloned()
+            .collect::<alloc::vec::Vec<u8>>();
+        Ok(WaBuffer::from_bytes(&str_data))
+    }
+}
+
+#[no_mangle]
+#[export_name = "__new"]
+pub fn new(size: usize, id: u32) -> WaPtr {
+    WaCell::new(size, id).ptr()
+}
+
+#[no_mangle]
+#[export_name = "__pin"]
+pub fn pin(ptr: WaPtr) -> WaPtr {
+    ptr
+}
+
+#[no_mangle]
+#[export_name = "__unpin"]
+pub fn unpin(_ptr: WaPtr) {}

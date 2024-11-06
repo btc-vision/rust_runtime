@@ -1,6 +1,6 @@
-use alloc::{format, string::ToString};
-
-use crate::utils::ToHex;
+use crate::utils::{to_hex, ToHex};
+use alloc::string::ToString;
+use core::fmt::Display;
 
 pub struct Environment {
     pub sender: super::Address,
@@ -13,8 +13,17 @@ pub struct Environment {
     pub safe_rnd: u64,
 }
 
-impl ToString for Environment {
-    fn to_string(&self) -> alloc::string::String {
-        format!("Environment\n sender: {}, origin: {}, transaction: {:?}, block_hash: {:?}, owner: {}, address: {}, timestamp: {}, safe_rnd: {}", self.sender.to_hex(), self.origin.to_hex(), self.transaction, self.block_hash, self.owner.to_hex(), self.address.to_hex(), self.timestamp, self.safe_rnd)
+impl Display for Environment {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.debug_struct("Environment")
+            .field("sender", &self.sender.to_hex())
+            .field("origin", &self.origin.to_hex())
+            .field("transaction", &to_hex(&self.transaction))
+            .field("block_hash", &to_hex(&self.block_hash))
+            .field("owner", &self.owner.to_hex())
+            .field("address", &self.address.to_hex())
+            .field("timestamp", &self.timestamp.to_string())
+            .field("safe_rnd", &self.safe_rnd.to_string())
+            .finish()
     }
 }

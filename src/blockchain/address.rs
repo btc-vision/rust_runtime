@@ -3,7 +3,7 @@ pub struct Address {
 }
 
 impl crate::utils::ToHex for Address {
-    fn get_bytes<'a>(&'a self) -> &'a [u8] {
+    fn get_bytes(&self) -> &[u8] {
         self.bytes.as_ref()
     }
 }
