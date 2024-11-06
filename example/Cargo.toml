@@ -15,7 +15,6 @@ strip = true
 
 [dependencies]
 rust_runtime = {path=".."}
-hex = "0.4.3"
 lol_alloc = "0.4.1"
 
 [features]

@@ -1,9 +1,6 @@
 #![no_std]
 extern crate alloc;
-use rust_runtime::{
-    contract::ContractTrait,
-    mem::{WaBuffer, WaPtr},
-};
+use rust_runtime::prelude::{ContractTrait, WaBuffer, WaPtr};
 mod contract;
 
 static mut CONTRACT: contract::Contract = contract::Contract::new();

@@ -9,7 +9,7 @@ pub trait ContractTrait {
         //unimplemented!("On deploy needs to be implemented");
     }
     fn execute(&mut self, buffer: WaBuffer) -> WaBuffer {
-        crate::log_str("On Deploy is not implemented");
+        crate::log_str("Execute is not implemented");
         //unimplemented!("Execute needs to be implemented");
         buffer
     }

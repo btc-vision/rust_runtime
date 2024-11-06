@@ -1,6 +1,6 @@
 #![no_std]
 use core::str::FromStr;
-use mem::{WaBuffer, WaPtr};
+use mem::WaPtr;
 extern crate alloc;
 
 pub mod blockchain;
@@ -8,8 +8,18 @@ pub mod constant;
 pub mod contract;
 pub mod cursor;
 pub mod env;
-pub mod mem;
+mod mem;
+pub mod prelude;
 pub mod utils;
+
+pub use crate::mem::WaBuffer;
+// This crate is much more bigger, then expected. Do not use it, if it is not necessary.
+pub use ethnum;
+
+pub use contract::{
+    op_20::{OP20Params, OP20Trait},
+    ContractTrait,
+};
 
 #[cfg(not(test))]
 #[cfg(not(feature = "std"))]
