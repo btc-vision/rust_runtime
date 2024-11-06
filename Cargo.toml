@@ -12,4 +12,5 @@ target = "wasm32-unknown-unknown"
 [dependencies]
 wee_alloc = "0.4.5"
 
-
+[features]
+std = []

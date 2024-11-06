@@ -31,11 +31,7 @@ impl<'a> Cursor<'a> {
     }
 
     pub fn read_u32(&mut self) -> u32 {
-        let result = u32::from_le_bytes(
-            self.inner[self.pos as usize..self.pos + 4]
-                .try_into()
-                .unwrap(),
-        );
+        let result = u32::from_le_bytes(self.inner[self.pos..self.pos + 4].try_into().unwrap());
         self.pos += 4;
         result
     }
@@ -51,15 +47,15 @@ pub struct WaCell {
 
 impl WaCell {
     const fn size() -> WaPtr {
-        mem::size_of::<WaCell>() as WaPtr
+        size_of::<Self>() as WaPtr
     }
     const fn usize() -> usize {
-        mem::size_of::<WaCell>()
+        size_of::<Self>()
     }
     const fn layout(size: usize) -> Layout {
         unsafe { Layout::from_size_align_unchecked(size + WaCell::usize(), 1) }
     }
-    pub fn new(size: usize, id: u32) -> Box<WaCell> {
+    pub fn new<'a>(size: usize, id: u32) -> &'a mut WaCell {
         unsafe {
             let layout = WaCell::layout(size);
             let ptr = alloc(layout);
@@ -78,9 +74,8 @@ impl WaCell {
         cell
     }
 
-    pub fn leak(mut self: Box<Self>) {
-        self.dec();
-        Box::leak(self);
+    pub fn from_raw<'a>(ptr: WaPtr) -> &'a mut WaCell {
+        unsafe { NonNull::<WaCell>::new_unchecked((ptr - WaCell::size()) as *mut WaCell).as_mut() }
     }
 
     pub fn drop(mut self: Box<Self>) {
@@ -121,108 +116,77 @@ impl WaCell {
         (self as *const Self as *const u8 as WaPtr) + WaCell::size()
     }
 
-    pub fn data<'a>(self: &Box<Self>) -> &[u8] {
+    pub fn data<'a>(&self) -> &'a [u8] {
         unsafe { slice::from_raw_parts(self.ptr() as *const u8, self.rt_size as usize) }
     }
 
-    pub fn data_mut<'a>(self: &mut Box<Self>) -> &mut [u8] {
+    pub fn data_mut(&mut self) -> &mut [u8] {
         unsafe { slice::from_raw_parts_mut(self.ptr() as *mut u8, self.rt_size as usize) }
     }
 
-    pub fn cursor<'a>(self: &mut Box<Self>) -> Cursor {
+    pub fn cursor(&mut self) -> Cursor {
         Cursor::new(self.data_mut())
     }
 }
 
-pub struct WaArray {
-    cell: Box<WaCell>,
-    buffer: Box<WaCell>,
+pub struct WaBuffer<'a> {
+    buffer: &'a mut WaCell,
+    pointer: &'a mut WaCell,
 }
 
-impl WaArray {
-    pub fn from_raw(ptr: WaPtr) -> WaArray {
-        let mut cell = WaCell::from_raw(ptr);
-        cell.inc();
-        let mut cursor = cell.cursor();
-        let buffer_ptr = cursor.read_u32();
-        let mut buffer = WaCell::from_raw(buffer_ptr);
-        buffer.inc();
-        WaArray { cell, buffer }
-    }
-
-    pub fn ptr(&self) -> WaPtr {
-        self.cell.ptr()
-    }
-
-    pub fn data(&self) -> &[u8] {
-        self.buffer.data()
-    }
-
-    pub fn to_raw(mut self) -> WaPtr {
-        self.buffer.dec();
-        self.buffer.to_raw();
-        self.cell.dec();
-        self.cell.to_raw()
-    }
-
-    pub fn leak(self) {
-        self.cell.leak();
-        self.buffer.leak();
-    }
-
-    pub fn drop(self) {
-        self.cell.drop();
-        self.buffer.drop();
-    }
-}
-
-pub struct WaString {
-    cell: Box<WaCell>,
-    buffer: Box<WaCell>,
-}
-impl WaString {
-    pub fn new(text: &str) -> WaString {
-        let len = (text.chars().count()) as u16;
+impl<'a> WaBuffer<'a> {
+    pub fn from_str(s: &str) -> WaBuffer<'a> {
+        let len = (s.chars().count()) as u16;
         let str_data = len
             .to_le_bytes()
             .iter()
-            // Write string itself
-            .chain(text.as_bytes())
+            .chain(s.as_bytes())
             .cloned()
             .collect::<alloc::vec::Vec<u8>>();
-        let buffer = WaCell::new_data(1, &str_data);
-        let cell = WaCell::new_data(
+        WaBuffer::from_bytes(&str_data)
+    }
+    pub fn from_bytes(bytes: &[u8]) -> WaBuffer<'a> {
+        let buffer = WaCell::new_data(1, bytes);
+        let pointer = WaCell::new_data(
             2,
             &[
                 buffer.ptr().to_le_bytes(),
                 buffer.ptr().to_le_bytes(),
-                (str_data.len() as u32).to_le_bytes(),
+                (bytes.len() as u32).to_le_bytes(),
             ]
             .concat(),
         );
-
-        WaString { cell, buffer }
+        WaBuffer { pointer, buffer }
+    }
+    pub fn from_raw(ptr: WaPtr) -> WaBuffer<'a> {
+        let pointer = WaCell::from_raw(ptr);
+        let mut cursor = pointer.cursor();
+        let buffer_ptr = cursor.read_u32();
+        let buffer = WaCell::from_raw(buffer_ptr);
+        WaBuffer { pointer, buffer }
     }
 
     pub fn ptr(&self) -> WaPtr {
-        self.cell.ptr()
+        self.pointer.ptr()
     }
 
     pub fn data(&self) -> &[u8] {
         self.buffer.data()
     }
 
-    pub fn to_raw(mut self) -> WaPtr {
-        self.buffer.dec();
-        self.buffer.to_raw();
-        self.cell.dec();
-        self.cell.to_raw()
+    pub fn to_raw(self) -> WaPtr {
+        self.pointer.to_raw()
     }
 
-    fn leak(self) {
-        self.cell.leak();
-        self.buffer.leak();
-    }
+    pub unsafe fn into_type<T>(&self) -> Result<&'a mut T, alloc::string::String> {
+        /*
+        super::log_str(&alloc::format!("Data: {:?}", self.cell.data()));
+        super::log_str(&self.buffer.ptr().to_string());
+        super::log_str(&alloc::format!("Data: {:?}", self.buffer.data()));
+         */
+        if core::mem::size_of::<T>() <= self.buffer.rt_size as usize {
+            #[cfg(feature = "std")]
+            println!("Casting memory");
 
     fn drop(self) {
         self.cell.drop();
@@ -314,3 +278,15 @@ pub fn collect() {
         MEMORY.extend(new); // Update with the new elements
     }
 }
+
+/*
+pub fn alloc_box_buffer(len: usize) -> Box<[u8]> {
+    if len == 0 {
+        return <Box<[u8]>>::default();
+    }
+    let layout = Layout::array::<u8>(len).unwrap();
+    let ptr = unsafe { alloc::alloc::alloc(layout) };
+    let slice_ptr = core::ptr::slice_from_raw_parts_mut(ptr, len);
+    unsafe { Box::from_raw(slice_ptr) }
+}
+ */

@@ -2912,7 +2912,7 @@ function asmFunc(imports) {
       if ($6_1 >>> 0 >= 16 >>> 0) {
        continue label$5
       }
-      break label$5;
+      break label$7;
      };
      break label$2;
     }
@@ -2998,6 +2998,7 @@ function asmFunc(imports) {
        default:
         break label$4;
        };
+       break label$3;
       }
       $3_1 = $0_1 + 20 | 0;
       $10_1 = HEAP32[1049700 >> 2] | 0;
@@ -4416,14 +4417,6 @@ function asmFunc(imports) {
   return i64toi32_i32$5 | 0;
  }
  
- function __wasm_ctz_i32(var$0) {
-  var$0 = var$0 | 0;
-  if (var$0) {
-   return 31 - Math_clz32((var$0 + -1 | 0) ^ var$0 | 0) | 0 | 0
-  }
-  return 32 | 0;
- }
- 
  function __wasm_i64_mul(var$0, var$0$hi, var$1, var$1$hi) {
   var$0 = var$0 | 0;
   var$0$hi = var$0$hi | 0;
@@ -4456,13 +4449,12 @@ function asmFunc(imports) {
   return i64toi32_i32$1 | 0;
  }
  
- function __wasm_rotl_i32(var$0, var$1) {
+ function __wasm_ctz_i32(var$0) {
   var$0 = var$0 | 0;
-  var$1 = var$1 | 0;
-  var var$2 = 0;
-  var$2 = var$1 & 31 | 0;
-  var$1 = (0 - var$1 | 0) & 31 | 0;
-  return ((-1 >>> var$2 | 0) & var$0 | 0) << var$2 | 0 | (((-1 << var$1 | 0) & var$0 | 0) >>> var$1 | 0) | 0 | 0;
+  if (var$0) {
+   return 31 - Math_clz32((var$0 + -1 | 0) ^ var$0 | 0) | 0 | 0
+  }
+  return 32 | 0;
  }
  
  bufferView = HEAPU8;
