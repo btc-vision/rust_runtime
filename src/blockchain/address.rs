@@ -1,3 +1,4 @@
+#[derive(Clone, Copy)]
 pub struct Address {
     pub bytes: [u8; crate::constant::ADDRESS_BYTE_LENGTH],
 }

@@ -27,3 +27,5 @@ impl Display for Environment {
             .finish()
     }
 }
+
+impl Environment {}
