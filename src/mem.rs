@@ -87,18 +87,18 @@ impl WaBuffer {
         let buffer = WaCell::new(size, 1);
         let pointer = WaCell::new(12, id);
         let mut cursor = pointer.cursor();
-        cursor.write_u32_le(buffer.ptr());
-        cursor.write_u32_le(buffer.ptr());
-        cursor.write_u32_le(size as u32);
+        cursor.write_u32_le(&buffer.ptr());
+        cursor.write_u32_le(&buffer.ptr());
+        cursor.write_u32_le(&(size as u32));
         WaBuffer { pointer, buffer }
     }
     pub fn from_bytes(bytes: &[u8]) -> WaBuffer {
         let buffer = WaCell::new_data(1, bytes);
         let pointer = WaCell::new(12, 2);
         let mut cursor = pointer.cursor();
-        cursor.write_u32_le(buffer.ptr());
-        cursor.write_u32_le(buffer.ptr());
-        cursor.write_u32_le(bytes.len() as u32);
+        cursor.write_u32_le(&buffer.ptr());
+        cursor.write_u32_le(&buffer.ptr());
+        cursor.write_u32_le(&(bytes.len() as u32));
         WaBuffer { pointer, buffer }
     }
     pub fn from_raw(ptr: WaPtr) -> WaBuffer {

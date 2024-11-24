@@ -10,6 +10,7 @@ pub mod error;
 pub mod event;
 pub mod math;
 mod mem;
+pub mod memory;
 pub mod prelude;
 pub mod types;
 pub mod utils;

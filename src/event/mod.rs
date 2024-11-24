@@ -20,9 +20,9 @@ impl Event {
         let mut cursor = buffer.cursor();
 
         cursor.write_string_with_len(event_type)?;
-        cursor.write_address(owner)?;
-        cursor.write_address(spender)?;
-        cursor.write_u256_le(value)?;
+        cursor.write_address(&owner)?;
+        cursor.write_address(&spender)?;
+        cursor.write_u256_le(&value)?;
 
         Ok(Event { buffer })
     }
@@ -33,8 +33,8 @@ impl Event {
         let mut cursor = buffer.cursor();
 
         cursor.write_string_with_len(event_type)?;
-        cursor.write_u32_le(32)?;
-        cursor.write_u256_le(amount)?;
+        cursor.write_u32_le(&32)?;
+        cursor.write_u256_le(&amount)?;
 
         Ok(Event { buffer })
     }
@@ -45,8 +45,8 @@ impl Event {
         let mut cursor = buffer.cursor();
 
         cursor.write_string_with_len(event_type)?;
-        cursor.write_u32_le(32)?;
-        cursor.write_u256_le(amount)?;
+        cursor.write_u32_le(&32)?;
+        cursor.write_u256_le(&amount)?;
 
         Ok(Event { buffer })
     }
@@ -57,9 +57,9 @@ impl Event {
         let mut cursor = buffer.cursor();
 
         cursor.write_string_with_len(event_type)?;
-        cursor.write_u32_le(64)?;
-        cursor.write_address(address)?;
-        cursor.write_u256_le(amount)?;
+        cursor.write_u32_le(&64)?;
+        cursor.write_address(&address)?;
+        cursor.write_u256_le(&amount)?;
 
         Ok(Event { buffer })
     }
@@ -70,8 +70,8 @@ impl Event {
         let mut cursor = buffer.cursor();
 
         cursor.write_string_with_len(event_type)?;
-        cursor.write_u32_le(32)?;
-        cursor.write_u256_le(amount)?;
+        cursor.write_u32_le(&32)?;
+        cursor.write_u256_le(&amount)?;
 
         Ok(Event { buffer })
     }
@@ -82,8 +82,8 @@ impl Event {
         let mut cursor = buffer.cursor();
 
         cursor.write_string_with_len(event_type)?;
-        cursor.write_u32_le(32)?;
-        cursor.write_u256_le(amount)?;
+        cursor.write_u32_le(&32)?;
+        cursor.write_u256_le(&amount)?;
 
         Ok(Event { buffer })
     }
@@ -98,9 +98,9 @@ impl Event {
         let mut cursor = buffer.cursor();
 
         cursor.write_string_with_len(event_type)?;
-        cursor.write_address(addr_from)?;
-        cursor.write_address(addr_to)?;
-        cursor.write_u256_le(amount)?;
+        cursor.write_address(&addr_from)?;
+        cursor.write_address(&addr_to)?;
+        cursor.write_u256_le(&amount)?;
 
         Ok(Event { buffer })
     }

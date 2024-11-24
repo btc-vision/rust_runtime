@@ -6,12 +6,6 @@ use rust_runtime::{
     ContractTrait, OP20Trait, WaBuffer,
 };
 
-/*
-const SELECTOR: [u8; 32] = sha2_const::Sha256::new()
-    .update("abcd".as_bytes())
-    .finalize();
- */
-
 pub struct Contract {
     environment: Option<&'static rust_runtime::blockchain::Environment>,
     params: rust_runtime::contract::op_20::OP20Params,
@@ -65,9 +59,3 @@ impl rust_runtime::contract::ContractTrait for Contract {
 
     fn on_deploy(&mut self, call_data: CallData) {}
 }
-
-/*
-impl rust_runtime::contract::op_20::OP20Trait for Contract {
-
-}
- */

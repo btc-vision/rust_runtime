@@ -1,4 +1,5 @@
 use crate::types::Selector;
+use ethnum::u256;
 
 impl super::Cursor {
     pub fn read_u32_le_unchecked(&mut self) -> u32 {
@@ -61,6 +62,24 @@ impl super::Cursor {
         } else {
             Err(crate::error::Error::NoMoreData)
         }
+    }
+
+    pub fn read_u256_le(&mut self) -> Result<u256, crate::error::Error> {
+        if self.reader + 32 < self.inner.len() {
+            let result = u256::from_le_bytes(
+                self.inner[self.reader..self.reader + 32]
+                    .try_into()
+                    .unwrap(),
+            );
+            self.reader += 32;
+            Ok(result)
+        } else {
+            Err(crate::error::Error::NoMoreData)
+        }
+    }
+
+    pub fn read_bool(&mut self) -> Result<bool, crate::error::Error> {
+        Ok((self.read_u8()?) != 0)
     }
 
     pub fn read_selector(&mut self) -> Result<Selector, crate::error::Error> {

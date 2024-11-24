@@ -1,3 +1,5 @@
+use ethnum::U256;
+
 use crate::{
     constant::ADDRESS_BYTE_LENGTH, cursor, math::abi::encode_selector_static, types::Selector,
     WaBuffer,
@@ -21,12 +23,23 @@ pub trait OP20Trait: super::ContractTrait {
             OWNER => {
                 let mut buffer = WaBuffer::new(ADDRESS_BYTE_LENGTH, 2);
                 let mut cursor = buffer.cursor();
-                cursor.write_address(self.owner())?;
+                cursor.write_address(&self.owner())?;
                 Ok(buffer)
             }
             _ => Err(crate::error::Error::UnknownSelector),
         }
     }
+
+    fn total_supply(&self) -> U256;
+    fn max_supply(&self) -> U256;
+    fn decimals(&self) -> u8;
+    fn name(&self) -> alloc::string::String;
+    fn symbol(&self) -> alloc::string::String;
+
+    fn allowance(&self, call_data: crate::types::CallData) -> crate::WaBuffer {
+        WaBuffer::from_bytes(call_data.into_inner())
+    }
+
     fn balance_of(&self, call_data: crate::types::CallData) -> crate::WaBuffer {
         WaBuffer::from_bytes(call_data.into_inner())
     }

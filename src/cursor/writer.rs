@@ -13,7 +13,7 @@ impl super::Cursor {
         }
     }
 
-    pub fn write_u16_le(&mut self, val: u16) -> Result<(), crate::error::Error> {
+    pub fn write_u16_le(&mut self, val: &u16) -> Result<(), crate::error::Error> {
         if self.writer + 2 < self.inner.len() {
             self.inner[self.writer..self.writer + 2].copy_from_slice(&val.to_le_bytes());
             self.writer += 2;
@@ -23,7 +23,7 @@ impl super::Cursor {
         }
     }
 
-    pub fn write_u32_le(&mut self, val: u32) -> Result<(), crate::error::Error> {
+    pub fn write_u32_le(&mut self, val: &u32) -> Result<(), crate::error::Error> {
         if self.writer + 4 < self.inner.len() {
             self.inner[self.writer..self.writer + 4].copy_from_slice(&val.to_le_bytes());
             self.writer += 4;
@@ -33,7 +33,7 @@ impl super::Cursor {
         }
     }
 
-    pub fn write_u64_le(&mut self, val: u64) -> Result<(), crate::error::Error> {
+    pub fn write_u64_le(&mut self, val: &u64) -> Result<(), crate::error::Error> {
         if self.writer + 8 < self.inner.len() {
             self.inner[self.writer..self.writer + 8].copy_from_slice(&val.to_le_bytes());
             self.writer += 8;
@@ -43,7 +43,7 @@ impl super::Cursor {
         }
     }
 
-    pub fn write_u128_le(&mut self, val: u128) -> Result<(), crate::error::Error> {
+    pub fn write_u128_le(&mut self, val: &u128) -> Result<(), crate::error::Error> {
         if self.writer + 16 < self.inner.len() {
             self.inner[self.writer..self.writer + 16].copy_from_slice(&val.to_le_bytes());
             self.writer += 16;
@@ -53,7 +53,7 @@ impl super::Cursor {
         }
     }
 
-    pub fn write_u256_le(&mut self, val: u256) -> Result<(), crate::error::Error> {
+    pub fn write_u256_le(&mut self, val: &u256) -> Result<(), crate::error::Error> {
         if self.writer + 32 < self.inner.len() {
             self.inner[self.writer..self.writer + 32].copy_from_slice(&val.to_le_bytes());
             self.writer += 32;
@@ -67,8 +67,8 @@ impl super::Cursor {
         self.write_u8(val.into())
     }
 
-    pub fn write_selector(&mut self, selector: Selector) -> Result<(), crate::error::Error> {
-        self.write_u32_le(selector)
+    pub fn write_selector(&mut self, selector: &Selector) -> Result<(), crate::error::Error> {
+        self.write_u32_le(&selector)
     }
 
     pub fn write_bytes(&mut self, bytes: &[u8]) -> Result<(), crate::error::Error> {
@@ -83,7 +83,7 @@ impl super::Cursor {
 
     pub fn write_bytes_with_len(&mut self, bytes: &[u8]) -> Result<(), crate::error::Error> {
         if self.writer + bytes.len() + 4 < self.inner.len() {
-            self.write_u32_le(bytes.len() as u32)?;
+            self.write_u32_le(&(bytes.len() as u32))?;
             self.write_bytes(bytes)
         } else {
             Err(crate::error::Error::BufferIsFull)
@@ -100,14 +100,14 @@ impl super::Cursor {
 
     pub fn write_string_with_len(&mut self, string: &str) -> Result<(), crate::error::Error> {
         if self.writer + string.len() + 2 > self.inner.len() {
-            self.write_u16_le(string.as_bytes().len() as u16)?;
+            self.write_u16_le(&(string.as_bytes().len() as u16))?;
             self.write_bytes_with_len(string.as_bytes())
         } else {
             Err(crate::error::Error::BufferIsFull)
         }
     }
 
-    pub fn write_address(&mut self, address: Address) -> Result<(), crate::error::Error> {
+    pub fn write_address(&mut self, address: &Address) -> Result<(), crate::error::Error> {
         if self.writer + ADDRESS_BYTE_LENGTH > self.inner.len() {
             self.write_bytes(&address.bytes)
         } else {

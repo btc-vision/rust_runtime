@@ -48,10 +48,10 @@ mod tests {
         let mut cursor = super::Cursor::from_slice(alloc::boxed::Box::leak(mem));
 
         cursor.write_u8(1).unwrap();
-        cursor.write_u16_le(2).unwrap();
-        cursor.write_u32_le(3).unwrap();
-        cursor.write_u64_le(4).unwrap();
-        cursor.write_u128_le(5).unwrap();
+        cursor.write_u16_le(&2).unwrap();
+        cursor.write_u32_le(&3).unwrap();
+        cursor.write_u64_le(&4).unwrap();
+        cursor.write_u128_le(&5).unwrap();
 
         assert_eq!(cursor.read_u8().unwrap(), 1);
         assert_eq!(cursor.read_u16_le().unwrap(), 2);
