@@ -62,18 +62,16 @@ impl From<[u8; crate::constant::STORE_VALUE_SIZE]> for StorageValue {
 
 impl From<&[u8; crate::constant::STORE_VALUE_SIZE]> for StorageValue {
     fn from(value: &[u8; crate::constant::STORE_VALUE_SIZE]) -> Self {
-        StorageValue {
-            inner: value.clone(),
-        }
+        StorageValue { inner: *value }
     }
 }
 
 impl From<&[u8]> for StorageValue {
     fn from(value: &[u8]) -> Self {
         let mut inner = [0u8; crate::constant::STORE_VALUE_SIZE];
-        for i in 0..value.len().max(crate::constant::STORE_VALUE_SIZE) {
-            inner[i] = value[i];
-        }
+        let length = value.len().min(crate::constant::STORE_VALUE_SIZE);
+
+        inner[0..length].copy_from_slice(&value[0..length]);
         StorageValue { inner }
     }
 }
@@ -120,44 +118,44 @@ impl From<bool> for StorageValue {
     }
 }
 
-impl Into<u8> for StorageValue {
-    fn into(self) -> u8 {
-        self.u8()
+impl From<StorageValue> for u8 {
+    fn from(val: StorageValue) -> Self {
+        val.u8()
     }
 }
 
-impl Into<u16> for StorageValue {
-    fn into(self) -> u16 {
-        self.u16()
+impl From<StorageValue> for u16 {
+    fn from(val: StorageValue) -> Self {
+        val.u16()
     }
 }
 
-impl Into<u32> for StorageValue {
-    fn into(self) -> u32 {
-        self.u32()
+impl From<StorageValue> for u32 {
+    fn from(val: StorageValue) -> Self {
+        val.u32()
     }
 }
 
-impl Into<u64> for StorageValue {
-    fn into(self) -> u64 {
-        self.u64()
+impl From<StorageValue> for u64 {
+    fn from(val: StorageValue) -> Self {
+        val.u64()
     }
 }
 
-impl Into<u128> for StorageValue {
-    fn into(self) -> u128 {
-        self.u128()
+impl From<StorageValue> for u128 {
+    fn from(val: StorageValue) -> Self {
+        val.u128()
     }
 }
 
-impl Into<u256> for StorageValue {
-    fn into(self) -> u256 {
-        self.u256()
+impl From<StorageValue> for u256 {
+    fn from(val: StorageValue) -> Self {
+        val.u256()
     }
 }
 
-impl Into<bool> for StorageValue {
-    fn into(self) -> bool {
-        self.bool()
+impl From<StorageValue> for bool {
+    fn from(val: StorageValue) -> Self {
+        val.bool()
     }
 }

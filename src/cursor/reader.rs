@@ -8,7 +8,7 @@ impl super::Cursor {
     }
 
     pub fn read_u8(&mut self) -> Result<u8, crate::error::Error> {
-        if self.reader + 1 <= self.inner.len() {
+        if self.reader < self.inner.len() {
             let result = self.inner[self.reader];
             self.reader += 1;
             Ok(result)

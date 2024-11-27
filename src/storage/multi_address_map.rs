@@ -38,7 +38,7 @@ impl MultiAddressMemoryMap {
     fn create_key_merger(&mut self, key: &AddressHash) {
         if !self.map.contains_key(key) {
             self.map.push(
-                key.clone(),
+                *key,
                 ArrayMerger::new(key.bytes.to_vec(), self.pointer, self.default_value),
             );
         }

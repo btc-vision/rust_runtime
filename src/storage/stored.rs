@@ -1,8 +1,8 @@
 use ethnum::u256;
 
 use super::{GlobalStore, StorageKey, StorageValue};
-use crate::{blockchain::AddressHash, constant, math::abi::encode_pointer};
-use core::convert::{From, Into};
+use crate::{blockchain::AddressHash, math::abi::encode_pointer};
+use core::convert::Into;
 
 pub trait StoredTrait<T, D>
 where
@@ -31,7 +31,7 @@ where
 {
     fn value(&mut self) -> T {
         if let Some(value) = &self.value {
-            value.clone()
+            *value
         } else {
             self.value = Some(
                 GlobalStore::get(
@@ -69,7 +69,7 @@ where
         }
     }
 
-    fn new(pointer: u16, sub_pointer: &StorageKey, default_value: D) -> Self {
+    pub fn new(pointer: u16, sub_pointer: &StorageKey, default_value: D) -> Self {
         Self {
             pointer: encode_pointer(pointer, sub_pointer),
             default_value,
@@ -89,7 +89,6 @@ pub type StoredAddress = Stored<AddressHash, AddressHash>;
 
 #[cfg(test)]
 mod tests {
-    use super::{Stored, StoredTrait};
 
     use ethnum::u256;
     #[test]

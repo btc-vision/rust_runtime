@@ -36,7 +36,7 @@ impl Cursor {
     }
 
     pub fn get_buffer(&self) -> WaBuffer {
-        return WaBuffer::from_bytes(self.inner);
+        WaBuffer::from_bytes(self.inner)
     }
 }
 

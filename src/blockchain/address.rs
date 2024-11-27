@@ -1,4 +1,3 @@
-use core::ops::Add;
 
 use crate::storage::StorageKey;
 
@@ -7,9 +6,9 @@ pub struct AddressHash {
     pub bytes: [u8; crate::constant::ADDRESS_BYTE_LENGTH],
 }
 
-impl Into<StorageKey> for AddressHash {
-    fn into(self) -> StorageKey {
-        self.bytes
+impl From<AddressHash> for StorageKey {
+    fn from(val: AddressHash) -> Self {
+        val.bytes
     }
 }
 

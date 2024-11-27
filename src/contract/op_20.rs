@@ -1,18 +1,15 @@
-use core::{clone, error, fmt::Error, num::Wrapping, ops::Add};
 
 use ethnum::u256;
 
 use crate::{
     blockchain::AddressHash,
     constant::ADDRESS_BYTE_LENGTH,
-    cursor, emit, log,
     math::abi::encode_selector_const,
     storage::{
         multi_address_map::MultiAddressMemoryMap,
         stored::{StoredTrait, StoredU256, StoredU8},
         stored_map::StoredMap,
         stored_string::StoredString,
-        value,
     },
     types::{CallData, Selector},
     WaBuffer,
@@ -124,7 +121,7 @@ pub trait OP20Trait: super::ContractTrait {
         self.params().max_supply.value()
     }
     fn decimals(&mut self) -> u8 {
-        self.params().decimals.value().into()
+        self.params().decimals.value()
     }
 
     fn name(&mut self) -> alloc::string::String {
@@ -171,7 +168,7 @@ pub trait OP20Trait: super::ContractTrait {
         let mut sender_map = self.allowance_map().get(owner);
         sender_map.set(&spender.bytes, value.into());
 
-        Self::create_approve_event(owner.clone(), spender.clone(), value)?;
+        Self::create_approve_event(*owner, *spender, value)?;
 
         Ok(true)
     }
@@ -189,7 +186,7 @@ pub trait OP20Trait: super::ContractTrait {
     }
 
     fn balance_of_base(&mut self, address: &AddressHash) -> u256 {
-        self.balance_of_map().get(&address, u256::ZERO).into()
+        self.balance_of_map().get(address, u256::ZERO).into()
     }
 
     fn balance_of(
@@ -216,7 +213,7 @@ pub trait OP20Trait: super::ContractTrait {
             return Err(crate::error::Error::InsufficientTotalSupply);
         }
 
-        let sender = self.environment().sender.clone();
+        let sender = self.environment().sender;
         if !self.balance_of_map().contains_key(&sender) {
             return Err(crate::error::Error::NoBalance);
         }
@@ -268,7 +265,7 @@ pub trait OP20Trait: super::ContractTrait {
             }
             self.total_supply().set(new);
 
-            Self::create_mint_event(to.clone(), value)?;
+            Self::create_mint_event(*to, value)?;
         }
         Ok(true)
     }
@@ -278,7 +275,7 @@ pub trait OP20Trait: super::ContractTrait {
         to: &AddressHash,
         value: u256,
     ) -> Result<bool, crate::error::Error> {
-        let sender = self.environment().sender.clone();
+        let sender = self.environment().sender;
         if self.is_self(&sender) {
             return Err(crate::error::Error::CanNotTransferFromSelfAccount);
         }
@@ -299,7 +296,7 @@ pub trait OP20Trait: super::ContractTrait {
         let new_balance = balance + value;
         self.balance_of_map().set(to, new_balance);
 
-        Self::create_transfer_event(sender, to.clone(), value)?;
+        Self::create_transfer_event(sender, *to, value)?;
         Ok(true)
     }
 
@@ -330,7 +327,7 @@ pub trait OP20Trait: super::ContractTrait {
 
         let new_allowance = allowed - value;
         owner_allowance_map.set(&spender.bytes, new_allowance.into());
-        self.allowance_map().set(owner.clone(), owner_allowance_map);
+        self.allowance_map().set(*owner, owner_allowance_map);
         Ok(())
     }
 
@@ -356,7 +353,7 @@ pub trait OP20Trait: super::ContractTrait {
             self.balance_of_map().set(to, new_to_balance);
         }
 
-        Self::create_transfer_event(from.clone(), to.clone(), value)?;
+        Self::create_transfer_event(*from, *to, value)?;
 
         Ok(true)
     }

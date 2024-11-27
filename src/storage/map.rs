@@ -1,9 +1,19 @@
+//! Simplified version Map
+//!
+
+/// Map structure
 pub struct Map<Key, Value>
 where
     Key: Sized + Eq,
     Value: Sized + Clone + Eq,
 {
     items: alloc::vec::Vec<(Key, Value)>,
+}
+// Implement default trait
+impl<Key: Sized + Eq, Value: Sized + Eq + Clone> Default for Map<Key, Value> {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl<Key: Sized + Eq, Value: Sized + Eq + Clone> Map<Key, Value> {
@@ -23,15 +33,15 @@ impl<Key: Sized + Eq, Value: Sized + Eq + Clone> Map<Key, Value> {
         self.items.clear();
     }
 
-    // Doesn not check for duplicities.
-    // Faster, but can make map unstable
+    /// Doesn not check for duplicities.
+    /// Faster, but can make map unstable
     pub fn push(&mut self, key: Key, value: Value) {
         self.items.push((key, value));
     }
 
-    // Check for duplicities
+    /// Insert element and check for duplicities
     pub fn insert(&mut self, key: Key, value: Value) -> Option<Value> {
-        if let Some((key, val)) = self.items.iter_mut().find(|(key, _)| key.eq(&key)) {
+        if let Some((_, val)) = self.items.iter_mut().find(|(key, _)| key.eq(key)) {
             let result = val.clone();
             *val = value;
             Some(result)
@@ -42,19 +52,15 @@ impl<Key: Sized + Eq, Value: Sized + Eq + Clone> Map<Key, Value> {
     }
 
     pub fn pop(&mut self) -> Option<(Key, Value)> {
-        if let Some(data) = self.items.pop() {
-            Some(data)
-        } else {
-            None
-        }
+        self.items.pop()
     }
 
     pub fn contains_key(&self, key: &Key) -> bool {
-        self.items.iter().find(|(k, _)| k.eq(key)).is_some()
+        self.items.iter().any(|(k, _)| k.eq(key))
     }
 
     pub fn contains_value(&self, value: &Value) -> bool {
-        self.items.iter().find(|(_, v)| v.eq(value)).is_some()
+        self.items.iter().any(|(_, v)| v.eq(value))
     }
 
     pub fn get(&self, key: &Key) -> Option<&Value> {
@@ -89,7 +95,7 @@ impl<Key: Sized + Eq, Value: Sized + Eq + Clone> Map<Key, Value> {
     }
 
     pub fn iter_values_mut(&mut self) -> impl Iterator<Item = &mut Value> {
-        self.items.iter_mut().map(|(k, v)| v)
+        self.items.iter_mut().map(|(_, v)| v)
     }
 
     pub fn remove(&mut self, key: &Key) -> Option<Value> {

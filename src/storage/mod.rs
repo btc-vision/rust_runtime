@@ -23,7 +23,7 @@ impl GlobalStore {
         if Self::has_key(key) {
             unsafe {
                 if let Some(value) = GLOBAL_STORE.get(key) {
-                    value.clone()
+                    *value
                 } else {
                     default_value
                 }
@@ -44,16 +44,16 @@ impl GlobalStore {
     fn has_key(key: &StorageKey) -> bool {
         unsafe {
             if GLOBAL_STORE.contains_key(key) {
-                true;
+                return true;
             };
 
             if let Ok(result) = crate::env::pointer_load(key) {
-                GLOBAL_STORE.push(key.clone(), result);
+                GLOBAL_STORE.push(*key, result);
                 return !result.zero();
             }
         }
 
-        return false;
+        false
     }
 
     fn ensure_key(key: &StorageKey, default_value: StorageValue) {
@@ -65,6 +65,6 @@ impl GlobalStore {
             return;
         }
 
-        Self::set(key.clone(), default_value);
+        Self::set(*key, default_value);
     }
 }

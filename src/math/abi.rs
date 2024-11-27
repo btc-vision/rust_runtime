@@ -38,12 +38,15 @@ pub fn encode_pointer(unique_identifier: u16, typed: &[u8]) -> StorageKey {
     final_pointer[0] = (unique_identifier & 0xff) as u8;
     final_pointer[1] = ((unique_identifier >> 8) & 0xff) as u8;
 
+    /*
     for i in 0..30 {
         // drop the last two bytes
         final_pointer[i + 2] = hash[i];
     }
+     */
+    final_pointer[2..30].copy_from_slice(&hash[..28]);
 
-    final_pointer.into()
+    final_pointer
 }
 
 #[cfg(test)]

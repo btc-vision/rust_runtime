@@ -4,7 +4,7 @@ use crate::{blockchain::AddressHash, constant::ADDRESS_BYTE_LENGTH, types::Selec
 
 impl super::Cursor {
     pub fn write_u8(&mut self, val: u8) -> Result<(), crate::error::Error> {
-        if self.writer + 1 <= self.inner.len() {
+        if self.writer < self.inner.len() {
             self.inner[self.writer] = val;
             self.writer += 1;
             Ok(())
@@ -68,7 +68,7 @@ impl super::Cursor {
     }
 
     pub fn write_selector(&mut self, selector: &Selector) -> Result<(), crate::error::Error> {
-        self.write_u32_le(&selector)
+        self.write_u32_le(selector)
     }
 
     pub fn write_bytes(&mut self, bytes: &[u8]) -> Result<(), crate::error::Error> {

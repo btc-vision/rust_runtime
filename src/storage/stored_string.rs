@@ -2,7 +2,7 @@ use alloc::string::String;
 
 use crate::{constant::STORE_VALUE_SIZE, storage::StorageValue};
 
-use super::{stored::StoredTrait, value, GlobalStore, StorageKey};
+use super::{stored::StoredTrait, GlobalStore};
 
 pub struct StoredString {
     pointer: u16,
@@ -21,8 +21,8 @@ impl StoredString {
 
     pub fn new(pointer: u16, default_value: &'static str) -> Self {
         Self {
-            pointer: pointer,
-            default_value: default_value.into(),
+            pointer,
+            default_value,
             value: None,
         }
     }
@@ -72,8 +72,8 @@ impl StoredString {
         let mut length = len.min(crate::constant::STORE_VALUE_SIZE);
         let mut value: alloc::vec::Vec<u8> = alloc::vec::Vec::with_capacity(len);
         let mut remaining = len - length;
-        for i in 0..length {
-            value.push(bytes[4 + i]);
+        for &byte in bytes.iter().skip(4).take(length) {
+            value.push(byte);
         }
 
         while remaining > 0 {
@@ -82,8 +82,8 @@ impl StoredString {
             let tmp = GlobalStore::get(&key, StorageValue::ZERO);
             let bytes = tmp.bytes();
             length = remaining.min(crate::constant::STORE_VALUE_SIZE);
-            for i in 0..length {
-                value.push(bytes[i]);
+            for &byte in bytes.iter().take(length) {
+                value.push(byte);
             }
             remaining -= length;
         }

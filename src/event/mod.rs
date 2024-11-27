@@ -1,4 +1,4 @@
-use crate::{blockchain::AddressHash, constant::ADDRESS_BYTE_LENGTH, cursor, log, WaBuffer};
+use crate::{blockchain::AddressHash, constant::ADDRESS_BYTE_LENGTH, WaBuffer};
 use ethnum::u256;
 
 pub trait EventTrait {

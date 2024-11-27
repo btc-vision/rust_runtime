@@ -1,8 +1,7 @@
 use rust_runtime::{
     blockchain::AddressHash,
-    contract::op_20::{Pointer, SELECTOR_TRANSFER},
+    contract::op_20::Pointer,
     ethnum::u256,
-    log,
     math::abi::encode_selector_const,
     storage::{
         multi_address_map::MultiAddressMemoryMap,
@@ -148,13 +147,9 @@ impl rust_runtime::contract::ContractTrait for Contract {
         mut call_data: CallData,
     ) -> Result<rust_runtime::WaBuffer, rust_runtime::error::Error> {
         let selector = call_data.read_selector()?;
-        log(&alloc::format!(
-            "Selector: {:x} {:x}",
-            selector,
-            SELECTOR_TRANSFER
-        ));
+
         Contract::execute(self, selector, call_data)
     }
 
-    fn on_deploy(&mut self, call_data: CallData) {}
+    fn on_deploy(&mut self, _call_data: CallData) {}
 }

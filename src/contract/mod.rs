@@ -1,9 +1,6 @@
-use crate::{blockchain::AddressHash, cursor, mem::WaBuffer, types::CallData};
+use crate::{blockchain::AddressHash, mem::WaBuffer, types::CallData};
 
 pub mod op_20;
-
-static mut INPUTS: Option<u8> = None;
-static mut OUTPUTS: Option<u8> = None;
 
 pub trait ContractTrait {
     fn set_environment(&mut self, environment: &'static crate::blockchain::Environment);
@@ -27,11 +24,11 @@ pub trait ContractTrait {
         Ok(())
     }
 
-    fn on_deploy(&mut self, call_data: CallData) {
+    fn on_deploy(&mut self, _call_data: CallData) {
         crate::log("On Deploy is not implemented");
     }
 
-    fn execute(&mut self, mut call_data: CallData) -> Result<WaBuffer, crate::error::Error> {
+    fn execute(&mut self, _call_data: CallData) -> Result<WaBuffer, crate::error::Error> {
         crate::log("Execute is not implemented");
         unimplemented!("Execute needs to be implemented");
     }

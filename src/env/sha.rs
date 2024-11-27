@@ -1,4 +1,5 @@
-use crate::mem::WaBuffer;
+#[allow(unused_imports)]
+use crate::WaBuffer;
 
 #[cfg(target_arch = "wasm32")]
 pub fn sha256(bytes: &[u8]) -> &'static [u8] {

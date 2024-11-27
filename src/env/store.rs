@@ -1,8 +1,11 @@
+#[allow(unused_imports)]
 use crate::{
     storage::{map::Map, StorageKey, StorageValue},
     WaBuffer,
 };
 
+#[allow(dead_code)]
+#[cfg(not(target_arch = "wasm32"))]
 static mut STORAGE: Map<StorageKey, StorageValue> = Map::new();
 
 #[cfg(target_arch = "wasm32")]
@@ -25,7 +28,7 @@ pub fn pointer_store(key: &StorageKey, value: &StorageValue) -> Result<bool, cra
  */
 #[cfg(not(target_arch = "wasm32"))]
 pub fn pointer_store(key: &StorageKey, value: &StorageValue) -> Result<bool, crate::error::Error> {
-    unsafe { STORAGE.insert(key.clone(), value.clone()) };
+    unsafe { STORAGE.insert(*key, *value) };
     Ok(true)
 }
 
@@ -43,7 +46,7 @@ pub fn pointer_load(key: &StorageKey) -> Result<StorageValue, crate::error::Erro
 }
 #[cfg(not(target_arch = "wasm32"))]
 pub fn pointer_load(key: &StorageKey) -> Result<StorageValue, crate::error::Error> {
-    unsafe { Ok(STORAGE.get(&key).unwrap_or(&StorageValue::ZERO).clone()) }
+    unsafe { Ok(*STORAGE.get(key).unwrap_or(&StorageValue::ZERO)) }
 }
 
 #[cfg(not(target_arch = "wasm32"))]

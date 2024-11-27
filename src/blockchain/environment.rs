@@ -1,9 +1,8 @@
 use crate::utils::{to_hex, ToHex};
 use alloc::string::ToString;
-use core::{default, fmt::Display, ops::Add};
-use ethnum::U256;
+use core::fmt::Display;
 
-use super::{address, transaction, AddressHash};
+use super::AddressHash;
 
 pub struct Environment {
     pub sender: super::AddressHash,
@@ -17,6 +16,7 @@ pub struct Environment {
 }
 
 impl Environment {
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         sender: AddressHash,
         origin: AddressHash,

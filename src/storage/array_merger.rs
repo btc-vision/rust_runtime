@@ -1,4 +1,3 @@
-use core::default;
 
 use alloc::vec::Vec;
 
@@ -28,7 +27,7 @@ impl ArrayMerger {
 
     pub fn set(&mut self, key: &[u8], value: StorageValue) {
         let key = self.get_key_hash(key);
-        GlobalStore::set(key.clone(), value.clone());
+        GlobalStore::set(key, value);
     }
 
     pub fn contains_key(&self, key: &[u8]) -> bool {
