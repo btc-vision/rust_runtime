@@ -8,8 +8,8 @@ impl crate::utils::ToHex for TransactionHash {
 }
 
 pub struct Transaction {
-    pub sender: super::Address,
-    pub origin: super::Address,
+    pub sender: super::AddressHash,
+    pub origin: super::AddressHash,
     pub hash: TransactionHash,
 }
 

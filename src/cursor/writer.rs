@@ -1,6 +1,6 @@
 use ethnum::u256;
 
-use crate::{blockchain::Address, constant::ADDRESS_BYTE_LENGTH, types::Selector};
+use crate::{blockchain::AddressHash, constant::ADDRESS_BYTE_LENGTH, types::Selector};
 
 impl super::Cursor {
     pub fn write_u8(&mut self, val: u8) -> Result<(), crate::error::Error> {
@@ -53,7 +53,7 @@ impl super::Cursor {
         }
     }
 
-    pub fn write_u256_le(&mut self, val: &u256) -> Result<(), crate::error::Error> {
+    pub fn write_u256_be(&mut self, val: &u256) -> Result<(), crate::error::Error> {
         if self.writer + 32 < self.inner.len() {
             self.inner[self.writer..self.writer + 32].copy_from_slice(&val.to_le_bytes());
             self.writer += 32;
@@ -107,7 +107,7 @@ impl super::Cursor {
         }
     }
 
-    pub fn write_address(&mut self, address: &Address) -> Result<(), crate::error::Error> {
+    pub fn write_address(&mut self, address: &AddressHash) -> Result<(), crate::error::Error> {
         if self.writer + ADDRESS_BYTE_LENGTH > self.inner.len() {
             self.write_bytes(&address.bytes)
         } else {

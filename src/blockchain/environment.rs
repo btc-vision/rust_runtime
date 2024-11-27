@@ -3,29 +3,27 @@ use alloc::string::ToString;
 use core::{default, fmt::Display, ops::Add};
 use ethnum::U256;
 
-use super::{address, transaction, Address};
+use super::{address, transaction, AddressHash};
 
 pub struct Environment {
-    pub sender: super::Address,
-    pub origin: super::Address,
+    pub sender: super::AddressHash,
+    pub origin: super::AddressHash,
     pub transaction_hash: super::TransactionHash,
     pub block_hash: super::BlockHash,
-    pub owner: super::Address,
-    pub address: super::Address,
+    pub owner: super::AddressHash,
+    pub address: super::AddressHash,
     pub timestamp: u64,
     pub safe_rnd: u64,
-    pointer: u16,
-    storage: crate::memory::map::Map<U256, U256>,
 }
 
 impl Environment {
     pub fn new(
-        sender: Address,
-        origin: Address,
+        sender: AddressHash,
+        origin: AddressHash,
         transaction_hash: super::TransactionHash,
         block_hash: super::BlockHash,
-        owner: Address,
-        address: Address,
+        owner: AddressHash,
+        address: AddressHash,
         timestamp: u64,
         safe_rnd: u64,
     ) -> Self {
@@ -38,30 +36,7 @@ impl Environment {
             address,
             timestamp,
             safe_rnd,
-            pointer: 0,
-            storage: crate::memory::map::Map::new(),
         }
-    }
-
-    pub fn next_pointer(&mut self) -> u16 {
-        self.pointer += 1;
-        self.pointer
-    }
-
-    pub fn get_storage_at(
-        &mut self,
-        key: &U256,
-        default: U256,
-    ) -> Result<bool, crate::error::Error> {
-        if self.storage.contains_key(key) {
-            return Ok(true);
-        }
-
-        let value = crate::env::pointer_load(key)?;
-        let result = value != U256::ZERO;
-        self.storage.push(key.clone(), value);
-
-        Ok(result)
     }
 }
 

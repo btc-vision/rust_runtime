@@ -1,4 +1,6 @@
 #![no_std]
+#![feature(const_for)]
+#![feature(const_trait_impl)]
 extern crate alloc;
 
 pub mod blockchain;
@@ -10,8 +12,8 @@ pub mod error;
 pub mod event;
 pub mod math;
 mod mem;
-pub mod memory;
 pub mod prelude;
+pub mod storage;
 pub mod types;
 pub mod utils;
 

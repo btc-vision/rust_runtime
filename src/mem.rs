@@ -138,11 +138,12 @@ impl WaBuffer {
 impl FromStr for WaBuffer {
     type Err = u8;
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let len = (s.chars().count()) as u16;
+        let bytes = s.as_bytes();
+        let len = bytes.len() as u16;
         let str_data = len
             .to_le_bytes()
             .iter()
-            .chain(s.as_bytes())
+            .chain(bytes)
             .cloned()
             .collect::<alloc::vec::Vec<u8>>();
         Ok(WaBuffer::from_bytes(&str_data))

@@ -1,4 +1,4 @@
-use crate::{blockchain::Address, constant::ADDRESS_BYTE_LENGTH, cursor, WaBuffer};
+use crate::{blockchain::AddressHash, constant::ADDRESS_BYTE_LENGTH, cursor, WaBuffer};
 use ethnum::u256;
 
 pub trait EventTrait {
@@ -11,8 +11,8 @@ pub struct Event {
 
 impl Event {
     pub fn approve(
-        owner: Address,
-        spender: Address,
+        owner: AddressHash,
+        spender: AddressHash,
         value: u256,
     ) -> Result<Self, crate::error::Error> {
         let event_type = "Approve";
@@ -22,7 +22,7 @@ impl Event {
         cursor.write_string_with_len(event_type)?;
         cursor.write_address(&owner)?;
         cursor.write_address(&spender)?;
-        cursor.write_u256_le(&value)?;
+        cursor.write_u256_be(&value)?;
 
         Ok(Event { buffer })
     }
@@ -34,7 +34,7 @@ impl Event {
 
         cursor.write_string_with_len(event_type)?;
         cursor.write_u32_le(&32)?;
-        cursor.write_u256_le(&amount)?;
+        cursor.write_u256_be(&amount)?;
 
         Ok(Event { buffer })
     }
@@ -46,12 +46,12 @@ impl Event {
 
         cursor.write_string_with_len(event_type)?;
         cursor.write_u32_le(&32)?;
-        cursor.write_u256_le(&amount)?;
+        cursor.write_u256_be(&amount)?;
 
         Ok(Event { buffer })
     }
 
-    pub fn mint(address: Address, amount: u256) -> Result<Self, crate::error::Error> {
+    pub fn mint(address: AddressHash, amount: u256) -> Result<Self, crate::error::Error> {
         let event_type = "Mint";
         let mut buffer = WaBuffer::new(event_type.len() + 6 + 32 + ADDRESS_BYTE_LENGTH, 2);
         let mut cursor = buffer.cursor();
@@ -59,7 +59,7 @@ impl Event {
         cursor.write_string_with_len(event_type)?;
         cursor.write_u32_le(&64)?;
         cursor.write_address(&address)?;
-        cursor.write_u256_le(&amount)?;
+        cursor.write_u256_be(&amount)?;
 
         Ok(Event { buffer })
     }
@@ -71,7 +71,7 @@ impl Event {
 
         cursor.write_string_with_len(event_type)?;
         cursor.write_u32_le(&32)?;
-        cursor.write_u256_le(&amount)?;
+        cursor.write_u256_be(&amount)?;
 
         Ok(Event { buffer })
     }
@@ -83,14 +83,14 @@ impl Event {
 
         cursor.write_string_with_len(event_type)?;
         cursor.write_u32_le(&32)?;
-        cursor.write_u256_le(&amount)?;
+        cursor.write_u256_be(&amount)?;
 
         Ok(Event { buffer })
     }
 
     pub fn transfer(
-        addr_from: Address,
-        addr_to: Address,
+        addr_from: AddressHash,
+        addr_to: AddressHash,
         amount: u256,
     ) -> Result<Self, crate::error::Error> {
         let event_type = "Transfer";
@@ -100,7 +100,7 @@ impl Event {
         cursor.write_string_with_len(event_type)?;
         cursor.write_address(&addr_from)?;
         cursor.write_address(&addr_to)?;
-        cursor.write_u256_le(&amount)?;
+        cursor.write_u256_be(&amount)?;
 
         Ok(Event { buffer })
     }

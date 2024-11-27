@@ -7,7 +7,7 @@ where
 }
 
 impl<Key: Sized + Eq, Value: Sized + Eq + Clone> Map<Key, Value> {
-    pub fn new() -> Self {
+    pub const fn new() -> Self {
         Self {
             items: alloc::vec::Vec::new(),
         }
@@ -17,6 +17,10 @@ impl<Key: Sized + Eq, Value: Sized + Eq + Clone> Map<Key, Value> {
         Self {
             items: alloc::vec::Vec::with_capacity(capacity),
         }
+    }
+
+    pub fn clear(&mut self) {
+        self.items.clear();
     }
 
     // Doesn not check for duplicities.

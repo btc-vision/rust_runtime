@@ -1,4 +1,4 @@
-use crate::types::Selector;
+use crate::{blockchain::AddressHash, storage::map::Map, types::Selector};
 use ethnum::u256;
 
 impl super::Cursor {
@@ -64,9 +64,9 @@ impl super::Cursor {
         }
     }
 
-    pub fn read_u256_le(&mut self) -> Result<u256, crate::error::Error> {
+    pub fn read_u256_be(&mut self) -> Result<u256, crate::error::Error> {
         if self.reader + 32 < self.inner.len() {
-            let result = u256::from_le_bytes(
+            let result = u256::from_be_bytes(
                 self.inner[self.reader..self.reader + 32]
                     .try_into()
                     .unwrap(),
@@ -84,5 +84,33 @@ impl super::Cursor {
 
     pub fn read_selector(&mut self) -> Result<Selector, crate::error::Error> {
         self.read_u32_le()
+    }
+
+    pub fn read_bytes(&mut self, size: usize) -> Result<&[u8], crate::error::Error> {
+        if self.reader + size < self.inner.len() {
+            let result = &self.inner[self.reader..self.reader + size];
+            self.reader += size;
+            Ok(result)
+        } else {
+            Err(crate::error::Error::NoMoreData)
+        }
+    }
+
+    pub fn read_address(&mut self) -> Result<AddressHash, crate::error::Error> {
+        Ok(AddressHash::new(
+            self.read_bytes(crate::constant::ADDRESS_BYTE_LENGTH)?,
+        ))
+    }
+
+    pub fn read_address_value_map(
+        &mut self,
+    ) -> Result<Map<AddressHash, u256>, crate::error::Error> {
+        let len = self.read_u16_le()?;
+        let mut result = Map::new();
+
+        for _ in 0..len {
+            result.insert(self.read_address()?, self.read_u256_be()?);
+        }
+        Ok(result)
     }
 }
