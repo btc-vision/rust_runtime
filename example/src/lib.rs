@@ -15,15 +15,11 @@ static ALLOCATOR: LeakingPageAllocator = LeakingPageAllocator;
 #[cfg(target_arch = "wasm32")]
 #[no_mangle]
 pub unsafe fn execute(ptr: WaPtr) -> WaPtr {
-    rust_runtime::log("Problem during contract execution");
-
-    return ptr;
-
     let mut cursor = WaBuffer::from_raw(ptr).cursor();
     match CONTRACT.execute(cursor) {
         Ok(buffer) => buffer.ptr(),
         Err(err) => {
-            rust_runtime::log("Problem during contract execution");
+            rust_runtime::log(err.as_str());
             WaBuffer::new(0, 1).ptr()
         }
     }

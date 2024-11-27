@@ -5,7 +5,7 @@ use ethnum::u256;
 use crate::{
     blockchain::AddressHash,
     constant::ADDRESS_BYTE_LENGTH,
-    cursor, emit,
+    cursor, emit, log,
     math::abi::encode_selector_const,
     storage::{
         multi_address_map::MultiAddressMemoryMap,
@@ -300,7 +300,6 @@ pub trait OP20Trait: super::ContractTrait {
         self.balance_of_map().set(to, new_balance);
 
         Self::create_transfer_event(sender, to.clone(), value)?;
-
         Ok(true)
     }
 
@@ -310,9 +309,9 @@ pub trait OP20Trait: super::ContractTrait {
     ) -> Result<crate::WaBuffer, crate::error::Error> {
         let mut response = WaBuffer::new(1, 1);
         let mut cursor = response.cursor();
-        cursor.write_bool(
-            self.transfer_base(&call_data.read_address()?, call_data.read_u256_be()?)?,
-        )?;
+        let result = self.transfer_base(&call_data.read_address()?, call_data.read_u256_be()?)?;
+
+        cursor.write_bool(result)?;
         Ok(response)
     }
 

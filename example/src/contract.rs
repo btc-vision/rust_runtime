@@ -1,8 +1,8 @@
 use rust_runtime::{
     blockchain::AddressHash,
-    contract::op_20::Pointer,
-    cursor,
-    ethnum::{self, u256},
+    contract::op_20::{Pointer, SELECTOR_TRANSFER},
+    ethnum::u256,
+    log,
     math::abi::encode_selector_const,
     storage::{
         multi_address_map::MultiAddressMemoryMap,
@@ -12,11 +12,12 @@ use rust_runtime::{
         StorageValue,
     },
     types::{CallData, Selector},
-    ContractTrait, OP20Trait, WaBuffer,
+    ContractTrait, OP20Trait,
 };
 
 const SELECTOR_AIRDROP: Selector = encode_selector_const("airdrop");
 const SELECTOR_AIRDROP_DEFINED: Selector = encode_selector_const("airdropDefined");
+const SELECTOR_MINT: Selector = encode_selector_const("mint");
 
 pub struct Contract {
     environment: Option<&'static rust_runtime::blockchain::Environment>,
@@ -55,10 +56,28 @@ impl Contract {
         call_data: CallData,
     ) -> Result<crate::WaBuffer, rust_runtime::error::Error> {
         match selector {
+            SELECTOR_MINT => self.mint(call_data),
             SELECTOR_AIRDROP => self.airdrop(call_data),
             SELECTOR_AIRDROP_DEFINED => self.airdrop_defined(call_data),
             _ => OP20Trait::execute_base(self, selector, call_data),
         }
+    }
+
+    fn mint(
+        &mut self,
+        mut call_data: CallData,
+    ) -> Result<crate::WaBuffer, rust_runtime::error::Error> {
+        self.only_owner(&self.environment().sender)?;
+
+        let mut response = crate::WaBuffer::new(32, 1);
+        let mut cursor = response.cursor();
+        cursor.write_bool(self.mint_base(
+            &call_data.read_address()?,
+            call_data.read_u256_be()?,
+            false,
+        )?)?;
+
+        return Ok(response);
     }
 
     fn airdrop(
@@ -73,7 +92,7 @@ impl Contract {
 
         let mut response = crate::WaBuffer::new(32, 1);
         let mut cursor = response.cursor();
-        cursor.write_bool(true);
+        cursor.write_bool(true)?;
         Ok(response)
     }
 
@@ -129,7 +148,11 @@ impl rust_runtime::contract::ContractTrait for Contract {
         mut call_data: CallData,
     ) -> Result<rust_runtime::WaBuffer, rust_runtime::error::Error> {
         let selector = call_data.read_selector()?;
-
+        log(&alloc::format!(
+            "Selector: {:x} {:x}",
+            selector,
+            SELECTOR_TRANSFER
+        ));
         Contract::execute(self, selector, call_data)
     }
 

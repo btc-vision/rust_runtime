@@ -7,10 +7,10 @@ pub const fn encode_selector_const(selector: &str) -> crate::types::Selector {
         .update(selector.as_bytes())
         .finalize();
 
-    ((bytes[0] as u32) << 24)
-        | ((bytes[1] as u32) << 16)
-        | ((bytes[2] as u32) << 8)
-        | (bytes[3] as u32)
+    ((bytes[3] as u32) << 24)
+        | ((bytes[2] as u32) << 16)
+        | ((bytes[1] as u32) << 8)
+        | (bytes[0] as u32)
 }
 
 /**

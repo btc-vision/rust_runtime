@@ -8,7 +8,7 @@ impl super::Cursor {
     }
 
     pub fn read_u8(&mut self) -> Result<u8, crate::error::Error> {
-        if self.reader + 1 < self.inner.len() {
+        if self.reader + 1 <= self.inner.len() {
             let result = self.inner[self.reader];
             self.reader += 1;
             Ok(result)
@@ -18,7 +18,7 @@ impl super::Cursor {
     }
 
     pub fn read_u16_le(&mut self) -> Result<u16, crate::error::Error> {
-        if self.reader + 2 < self.inner.len() {
+        if self.reader + 2 <= self.inner.len() {
             let result =
                 u16::from_le_bytes(self.inner[self.reader..self.reader + 2].try_into().unwrap());
             self.reader += 2;
@@ -29,7 +29,7 @@ impl super::Cursor {
     }
 
     pub fn read_u32_le(&mut self) -> Result<u32, crate::error::Error> {
-        if self.reader + 4 < self.inner.len() {
+        if self.reader + 4 <= self.inner.len() {
             let result =
                 u32::from_le_bytes(self.inner[self.reader..self.reader + 4].try_into().unwrap());
             self.reader += 4;
@@ -40,7 +40,7 @@ impl super::Cursor {
     }
 
     pub fn read_u64_le(&mut self) -> Result<u64, crate::error::Error> {
-        if self.reader + 8 < self.inner.len() {
+        if self.reader + 8 <= self.inner.len() {
             let result =
                 u64::from_le_bytes(self.inner[self.reader..self.reader + 8].try_into().unwrap());
             self.reader += 8;
@@ -51,7 +51,7 @@ impl super::Cursor {
     }
 
     pub fn read_u128_le(&mut self) -> Result<u128, crate::error::Error> {
-        if self.reader + 16 < self.inner.len() {
+        if self.reader + 16 <= self.inner.len() {
             let result = u128::from_le_bytes(
                 self.inner[self.reader..self.reader + 16]
                     .try_into()
@@ -65,7 +65,7 @@ impl super::Cursor {
     }
 
     pub fn read_u256_be(&mut self) -> Result<u256, crate::error::Error> {
-        if self.reader + 32 < self.inner.len() {
+        if self.reader + 32 <= self.inner.len() {
             let result = u256::from_be_bytes(
                 self.inner[self.reader..self.reader + 32]
                     .try_into()
@@ -87,7 +87,7 @@ impl super::Cursor {
     }
 
     pub fn read_bytes(&mut self, size: usize) -> Result<&[u8], crate::error::Error> {
-        if self.reader + size < self.inner.len() {
+        if self.reader + size <= self.inner.len() {
             let result = &self.inner[self.reader..self.reader + size];
             self.reader += size;
             Ok(result)
