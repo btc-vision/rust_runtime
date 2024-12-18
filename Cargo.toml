@@ -1,16 +1,29 @@
+[workspace.package]
+version = "0.1.0"
+authors = ["Martin Miksanik"]
+description = "Rust runtime for OP_NET"
+documentation = "https://dev.opnet.org/"
+edition = "2021"
+
+[workspace.dependencies]
+# This crate is much larger than expected. Avoid using it unless absolutely necessary.
+ethnum = "1.5.0"
+lol_alloc = "0.4.1"
+rust_runtime = { path = "." }
+sha2-const = "0.1.2"
+
 [package]
 name = "rust_runtime"
-version = "0.1.0"
-edition = "2021"
+version = { workspace = true }
+edition = { workspace = true }
 
 [workspace]
 members = ["example"]
 
-[build]
-target = "wasm32-unknown-unknown"
-
 [dependencies]
-wee_alloc = "0.4.5"
+# This crate is much larger than expected. Avoid using it unless absolutely necessary.
+ethnum = { workspace = true }
+sha2-const = {workspace = true }
 
 [features]
 std = []
