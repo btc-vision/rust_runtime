@@ -3,6 +3,9 @@ use alloc::slice;
 use core::ptr::NonNull;
 use core::str::FromStr;
 
+#[cfg(feature = "std")]
+use libc_print::std_name::println;
+
 use crate::cursor::Cursor; // Import format and String from alloc
 
 extern crate alloc;
@@ -15,6 +18,8 @@ pub struct WaCell {
     pub gc_info2: u64,
     pub rt_id: u32,
     pub rt_size: u32,
+    #[cfg(not(target_arch = "wasm32"))]
+    pub data: &'static mut [u8],
 }
 
 impl WaCell {
@@ -31,12 +36,18 @@ impl WaCell {
         unsafe {
             let layout = WaCell::layout(size);
             let ptr = alloc(layout);
+
             let cell = NonNull::<WaCell>::new_unchecked(ptr.cast()).as_mut();
 
             cell.gc_info1 = 0;
             cell.mm_info = ptr as u64;
             cell.rt_id = id;
             cell.rt_size = size as u32;
+            #[cfg(not(target_arch = "wasm32"))]
+            {
+                let data = alloc(Layout::from_size_align_unchecked(size, 1));
+                cell.data = core::slice::from_raw_parts_mut(data, size);
+            }
             cell
         }
     }
@@ -56,12 +67,27 @@ impl WaCell {
         (self as *const Self as *const u8 as WaPtr) + WaCell::size()
     }
 
+    #[cfg(target_arch = "wasm32")]
     pub fn data(&self) -> &'static [u8] {
-        unsafe { slice::from_raw_parts(self.ptr() as *const u8, self.rt_size as usize) }
+        #[cfg(target_arch = "wasm32")]
+        unsafe {
+            slice::from_raw_parts(self.ptr() as *const u8, self.rt_size as usize)
+        }
     }
 
+    #[cfg(not(target_arch = "wasm32"))]
+    pub fn data(&self) -> &'static [u8] {
+        unsafe { slice::from_raw_parts(self.data.as_ptr(), self.rt_size as usize) }
+    }
+
+    #[cfg(target_arch = "wasm32")]
     pub fn data_mut(&mut self) -> &'static mut [u8] {
         unsafe { slice::from_raw_parts_mut(self.ptr() as *mut u8, self.rt_size as usize) }
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    pub fn data_mut(&mut self) -> &'static mut [u8] {
+        unsafe { slice::from_raw_parts_mut(self.data.as_mut_ptr(), self.rt_size as usize) }
     }
 
     pub fn cursor(&mut self) -> super::cursor::Cursor {

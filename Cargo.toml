@@ -24,6 +24,7 @@ members = ["example"]
 # This crate is much larger than expected. Avoid using it unless absolutely necessary.
 ethnum = { workspace = true }
 sha2-const = {workspace = true }
+libc-print = {version = "0.1.22", optional=true}
 
 [features]
 std = []

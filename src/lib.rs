@@ -1,6 +1,8 @@
 #![no_std]
 #![feature(const_for)]
 #![feature(const_trait_impl)]
+#![feature(stmt_expr_attributes)]
+#![feature(str_from_raw_parts)]
 extern crate alloc;
 
 pub mod blockchain;

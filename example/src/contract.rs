@@ -166,3 +166,72 @@ impl rust_runtime::contract::ContractTrait for Contract {
 
     fn on_deploy(&mut self, _call_data: CallData) {}
 }
+
+#[cfg(test)]
+mod tests {
+    use rust_runtime::{
+        blockchain::{AddressHash, TransactionHash},
+        ethnum::u256,
+        WaBuffer,
+    };
+
+    use crate::contract::SELECTOR_MINT;
+
+    #[test]
+    fn test_contract_name() {
+        let mut contract = super::Contract::new();
+
+        let mut buffer = WaBuffer::new(0, 1).unwrap();
+        let mut result = contract
+            .execute(
+                rust_runtime::contract::op_20::SELECTOR_NAME,
+                buffer.cursor(),
+            )
+            .unwrap();
+
+        let mut cursor = result.cursor();
+        assert_eq!(contract.params.name, cursor.read_string_with_len().unwrap());
+    }
+
+    #[test]
+    fn test_contract_total_supply() {
+        let mut contract = super::Contract::new();
+        let address = AddressHash::new(&[
+            223, 139, 191, 239, 93, 189, 81, 15, 99, 20, 253, 253, 223, 251, 207, 31, 133, 139,
+            175, 201, 19, 59, 128, 1, 13, 88, 160, 143, 140, 87, 84, 92,
+        ]);
+        let environment = alloc::boxed::Box::new(rust_runtime::blockchain::Environment {
+            address: address.clone(),
+            block_hash: rust_runtime::blockchain::BlockHash {
+                bytes: address.bytes.clone(),
+            },
+            sender: address.clone(),
+            deployer: address.clone(),
+            origin: address.clone(),
+            transaction_hash: TransactionHash {
+                bytes: address.bytes.clone(),
+            },
+            timestamp: 0,
+            safe_rnd: 0,
+        });
+        contract.environment = Some(alloc::boxed::Box::leak(environment));
+        let amount = u256::new(10000000);
+
+        let mut buffer = WaBuffer::new(64, 1).unwrap();
+        let mut cursor = buffer.cursor();
+        cursor.write_address(&address).unwrap();
+        cursor.write_u256_be(&amount).unwrap();
+        contract.execute(SELECTOR_MINT, cursor).unwrap();
+
+        let mut buffer = WaBuffer::new(0, 1).unwrap();
+        let mut result = contract
+            .execute(
+                rust_runtime::contract::op_20::SELECTOR_TOTAL_SUPPLY,
+                buffer.cursor(),
+            )
+            .unwrap();
+
+        let mut cursor = result.cursor();
+        assert_eq!(cursor.read_u256_be().unwrap(), amount);
+    }
+}

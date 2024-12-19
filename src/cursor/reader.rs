@@ -1,3 +1,5 @@
+use core::str;
+
 use crate::{blockchain::AddressHash, storage::map::Map, types::Selector};
 use ethnum::u256;
 
@@ -126,5 +128,18 @@ impl super::Cursor {
             result.insert(self.read_address()?, self.read_u256_be()?);
         }
         Ok(result)
+    }
+
+    pub fn read_string_with_len(&mut self) -> Result<&str, crate::error::Error> {
+        let len = self.read_u16_le()?;
+
+        let pos = self.reader;
+        self.reader += len as usize;
+        unsafe {
+            Ok(str::from_raw_parts(
+                self.inner.as_ptr().add(pos as usize),
+                len as usize,
+            ))
+        }
     }
 }
