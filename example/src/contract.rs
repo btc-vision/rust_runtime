@@ -173,6 +173,7 @@ mod tests {
         contract::op_20::{SELECTOR_BALANCE_OF, SELECTOR_NAME},
         ethnum::u256,
         tests::{execute, execute_address, execute_address_amount, random_environment},
+        ContractTrait,
     };
 
     use crate::contract::SELECTOR_MINT;
@@ -200,13 +201,15 @@ mod tests {
         let amount = u256::new(10000000);
 
         execute_address_amount(&mut contract, SELECTOR_MINT, &address, amount);
+        execute_address_amount(&mut contract, SELECTOR_MINT, &address, amount);
+
         let mut cursor = execute(
             &mut contract,
             rust_runtime::contract::op_20::SELECTOR_TOTAL_SUPPLY,
         );
-        assert_eq!(cursor.read_u256_be().unwrap(), amount);
+        assert_eq!(cursor.read_u256_be().unwrap(), 2 * amount);
 
         let mut cursor = execute_address(&mut contract, SELECTOR_BALANCE_OF, &address);
-        assert_eq!(cursor.read_u256_be().unwrap(), amount);
+        assert_eq!(cursor.read_u256_be().unwrap(), 2 * amount);
     }
 }
