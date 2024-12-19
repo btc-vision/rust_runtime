@@ -5,10 +5,26 @@ use crate::{
     cursor::Cursor,
 };
 
+#[cfg(not(target_arch = "wasm32"))]
 pub fn random_bytes() -> [u8; 32] {
     let mut result = [0u8; 32];
     result.iter_mut().for_each(|b| *b = rand::random::<u8>());
     result
+}
+
+#[cfg(target_arch = "wasm32")]
+pub fn random_bytes() -> [u8; 32] {
+    [0; 32]
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+pub fn random_u64() -> u64 {
+    rand::random()
+}
+
+#[cfg(target_arch = "wasm32")]
+pub fn random_u64() -> u64 {
+    0
 }
 
 pub fn random_address() -> AddressHash {
@@ -38,7 +54,7 @@ pub fn random_environment() -> Environment {
         origin: random_address(),
         transaction_hash: random_transaction(),
         timestamp: 0,
-        safe_rnd: rand::random(),
+        safe_rnd: random_u64(),
     }
 }
 

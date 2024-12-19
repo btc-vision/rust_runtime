@@ -170,11 +170,9 @@ impl rust_runtime::contract::ContractTrait for Contract {
 #[cfg(test)]
 mod tests {
     use rust_runtime::{
-        blockchain::{AddressHash, TransactionHash},
-        contract::op_20::SELECTOR_BALANCE_OF,
+        contract::op_20::{SELECTOR_BALANCE_OF, SELECTOR_NAME},
         ethnum::u256,
         tests::{execute, execute_address, execute_address_amount, random_environment},
-        WaBuffer,
     };
 
     use crate::contract::SELECTOR_MINT;
@@ -183,15 +181,7 @@ mod tests {
     fn test_contract_name() {
         let mut contract = super::Contract::new();
 
-        let mut buffer = WaBuffer::new(0, 1).unwrap();
-        let mut result = contract
-            .execute(
-                rust_runtime::contract::op_20::SELECTOR_NAME,
-                buffer.cursor(),
-            )
-            .unwrap();
-
-        let mut cursor = result.cursor();
+        let mut cursor = execute(&mut contract, SELECTOR_NAME);
         assert_eq!(contract.params.name, cursor.read_string_with_len().unwrap());
     }
 
