@@ -19,6 +19,8 @@ pub mod storage;
 pub mod types;
 pub mod utils;
 
+pub mod tests;
+
 pub use crate::mem::WaBuffer;
 pub use env::*;
 pub use ethnum;

@@ -25,6 +25,7 @@ members = ["example"]
 ethnum = { workspace = true }
 sha2-const = {workspace = true }
 libc-print = {version = "0.1.22", optional=true}
+rand = {version = "0.8.5"}
 
 [features]
 std = []
