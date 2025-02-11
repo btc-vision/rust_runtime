@@ -7,7 +7,6 @@ mod global;
 mod sha;
 mod store;
 
-pub use address::*;
 pub use sha::*;
 pub use store::*;
 
@@ -21,7 +20,7 @@ pub fn log(text: &str) {
 }
 
 #[cfg(not(target_arch = "wasm32"))]
-pub fn log(text: &str) {}
+pub fn log(_text: &str) {}
 
 #[cfg(target_arch = "wasm32")]
 pub fn emit(buffer: WaBuffer) {
@@ -29,4 +28,4 @@ pub fn emit(buffer: WaBuffer) {
 }
 
 #[cfg(not(target_arch = "wasm32"))]
-pub fn emit(buffer: WaBuffer) {}
+pub fn emit(_buffer: WaBuffer) {}
