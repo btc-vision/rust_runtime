@@ -1,4 +1,7 @@
 #[cfg(target_arch = "wasm32")]
+use crate::mem::WaPtr;
+
+#[cfg(target_arch = "wasm32")]
 #[link(wasm_import_module = "env")]
 extern "C" {
     #[allow(dead_code)]

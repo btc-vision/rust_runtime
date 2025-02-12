@@ -23,9 +23,8 @@ members = ["example"]
 [dependencies]
 # This crate is much larger than expected. Avoid using it unless absolutely necessary.
 ethnum = { workspace = true }
-once_cell = "1.20.3"
 sha2-const = { workspace = true }
-spin = "0.9.8"
+spin = { version = "0.9.8", features=["mutex", "lazy"]}
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 rand = { version = "0.8.5" }

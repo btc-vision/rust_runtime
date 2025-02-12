@@ -1,6 +1,5 @@
 use crate::storage::map::Map;
-use once_cell::sync::Lazy;
-use spin::Mutex;
+use spin::{Lazy, Mutex};
 
 pub mod array_merger;
 pub mod key;
