@@ -1,4 +1,6 @@
-use map::Map;
+use crate::storage::map::Map;
+use once_cell::sync::Lazy;
+use spin::Mutex;
 
 pub mod array_merger;
 pub mod key;
@@ -12,54 +14,50 @@ pub mod value;
 pub use key::StorageKey;
 pub use value::StorageValue;
 
-#[allow(static_mut_refs)]
-static mut GLOBAL_STORE: Map<StorageKey, StorageValue> = Map::new();
+static GLOBAL_STORE: Lazy<Mutex<Map<StorageKey, StorageValue>>> =
+    Lazy::new(|| Mutex::new(Map::new()));
 
 pub struct GlobalStore {}
 
 impl GlobalStore {
     pub fn get(key: &StorageKey, default_value: StorageValue) -> StorageValue {
-        if Self::has_key(key) {
-            #[allow(static_mut_refs)]
-            unsafe {
-                if let Some(value) = GLOBAL_STORE.get(key) {
-                    *value
-                } else {
-                    if let Ok(result) = crate::env::pointer_load(key) {
-                        GLOBAL_STORE.insert(key.clone(), result);
-                        result
-                    } else {
+        let mut store = GLOBAL_STORE.lock();
+        if store.contains_key(key) {
+            *store.get(key).unwrap()
+        } else {
+            match crate::env::pointer_load(key) {
+                Ok(result) => {
+                    if result == StorageValue::ZERO && default_value != StorageValue::ZERO {
+                        store.insert(key.clone(), default_value);
                         default_value
+                    } else {
+                        store.insert(key.clone(), result);
+                        result
                     }
                 }
+                Err(_) => default_value,
             }
-        } else {
-            default_value
         }
     }
 
     pub fn set(key: StorageKey, value: StorageValue) {
         assert!(crate::env::pointer_store(&key, &value).unwrap());
-
-        #[allow(static_mut_refs)]
-        unsafe {
-            GLOBAL_STORE.insert(key, value);
-        }
+        let mut store = GLOBAL_STORE.lock();
+        store.insert(key, value);
     }
 
     pub fn has_key(key: &StorageKey) -> bool {
-        #[allow(static_mut_refs)]
-        unsafe {
-            if GLOBAL_STORE.contains_key(key) {
-                return true;
-            };
-
-            if let Ok(result) = crate::env::pointer_load(key) {
-                GLOBAL_STORE.insert(*key, result);
-                return !result.zero();
+        let mut store = GLOBAL_STORE.lock();
+        if store.contains_key(key) {
+            true
+        } else {
+            match crate::env::pointer_load(key) {
+                Ok(result) => {
+                    store.insert(key.clone(), result);
+                    !result.zero()
+                }
+                Err(_) => false,
             }
         }
-
-        false
     }
 }

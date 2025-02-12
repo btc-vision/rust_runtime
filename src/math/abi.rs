@@ -54,6 +54,7 @@ pub fn encode_pointer(unique_identifier: u16, typed: &[u8]) -> StorageKey {
     final_pointer
 }
 
+/*
 #[cfg(test)]
 mod tests {
     #[test]
@@ -61,3 +62,4 @@ mod tests {
         let selector = "Abi";
     }
 }
+*/

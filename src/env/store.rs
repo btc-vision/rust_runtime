@@ -3,10 +3,13 @@ use crate::{
     storage::{map::Map, StorageKey, StorageValue},
     WaBuffer,
 };
+use once_cell::sync::Lazy;
+use spin::Mutex;
 
-#[allow(dead_code)]
+/// For test purposes only: This global storage is used to mock the VM’s load/store behavior.
+/// (In production the runtime uses GlobalStore instead.)
 #[cfg(not(target_arch = "wasm32"))]
-static mut STORAGE: Map<StorageKey, StorageValue> = Map::new();
+static STORAGE: Lazy<Mutex<Map<StorageKey, StorageValue>>> = Lazy::new(|| Mutex::new(Map::new()));
 
 #[cfg(target_arch = "wasm32")]
 pub fn pointer_store(key: &StorageKey, value: &StorageValue) -> Result<bool, crate::error::Error> {
@@ -23,12 +26,11 @@ pub fn pointer_store(key: &StorageKey, value: &StorageValue) -> Result<bool, cra
     }
 }
 
-/**
- * For unit test only
- */
+/// For unit tests only: Write the key/value pair to our mocked storage.
 #[cfg(not(target_arch = "wasm32"))]
 pub fn pointer_store(key: &StorageKey, value: &StorageValue) -> Result<bool, crate::error::Error> {
-    unsafe { STORAGE.insert(*key, *value) };
+    let mut storage = STORAGE.lock();
+    storage.insert(*key, *value);
     Ok(true)
 }
 
@@ -45,38 +47,17 @@ pub fn pointer_load(key: &StorageKey) -> Result<StorageValue, crate::error::Erro
         Ok(value)
     }
 }
+
+/// For unit tests only: Read the value from our mocked storage.
 #[cfg(not(target_arch = "wasm32"))]
-#[allow(static_mut_refs)]
 pub fn pointer_load(key: &StorageKey) -> Result<StorageValue, crate::error::Error> {
-    unsafe { Ok(*STORAGE.get(key).unwrap_or(&StorageValue::ZERO)) }
+    let storage = STORAGE.lock();
+    Ok(*storage.get(key).unwrap_or(&StorageValue::ZERO))
 }
 
+/// For unit tests only: Clear the mocked storage.
 #[cfg(not(target_arch = "wasm32"))]
-#[allow(static_mut_refs)]
 pub fn pointer_storage_reset() {
-    unsafe {
-        STORAGE.clear();
-    }
+    let mut storage = STORAGE.lock();
+    storage.clear();
 }
-
-/*
-pub fn pointer_next_greater_than(
-    target_pointer: &StorageKey,
-    value_at_least: &StorageValue,
-    lte: bool,
-) -> Result<StorageValue, crate::error::Error> {
-    let mut buffer = WaBuffer::new(64, 1)?;
-    let mut cursor = buffer.cursor();
-    cursor.write_bytes(target_pointer)?;
-    cursor.write_bytes(value_at_least.bytes())?;
-    cursor.write_bool(lte)?;
-
-    unsafe {
-        Ok(
-            WaBuffer::from_raw(super::global::nextPointerGreaterThan(buffer.ptr()))
-                .data()
-                .into(),
-        )
-    }
-}
- */

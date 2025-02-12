@@ -133,6 +133,7 @@ impl rust_runtime::contract::op_20::OP20Trait for Contract {
     fn params(&mut self) -> &mut rust_runtime::OP20Params {
         &mut self.params
     }
+
     fn total_supply(&mut self) -> &mut StoredU256 {
         &mut self.total_supply
     }
@@ -167,19 +168,21 @@ impl rust_runtime::contract::ContractTrait for Contract {
     fn on_deploy(&mut self, _call_data: CallData) {}
 }
 
+// To run the tests, run `cargo test -p example` in the root of the workspace
 #[cfg(test)]
 mod tests {
-    use rust_runtime::{
-        contract::op_20::{SELECTOR_BALANCE_OF, SELECTOR_NAME},
-        ethnum::u256,
-        tests::{execute, execute_address, execute_address_amount, random_environment},
-        ContractTrait,
-    };
-
     use crate::contract::SELECTOR_MINT;
+    use rust_runtime::{
+        contract::op_20::{SELECTOR_BALANCE_OF, SELECTOR_NAME, SELECTOR_TOTAL_SUPPLY},
+        ethnum::u256,
+        pointer_storage_reset,
+        tests::{execute, execute_address, execute_address_amount, random_environment},
+    };
 
     #[test]
     fn test_contract_name() {
+        pointer_storage_reset();
+
         let mut contract = super::Contract::new();
 
         let mut cursor = execute(&mut contract, SELECTOR_NAME);
@@ -187,8 +190,11 @@ mod tests {
     }
 
     #[test]
-    fn test_contract_total_supply() {
+    fn test_contract_mint() {
+        pointer_storage_reset();
+
         let mut contract = super::Contract::new();
+
         let address = rust_runtime::tests::random_address();
 
         let environment = alloc::boxed::Box::new(rust_runtime::blockchain::Environment {
@@ -200,16 +206,52 @@ mod tests {
         contract.environment = Some(alloc::boxed::Box::leak(environment));
         let amount = u256::new(10000000);
 
-        execute_address_amount(&mut contract, SELECTOR_MINT, &address, amount);
-        execute_address_amount(&mut contract, SELECTOR_MINT, &address, amount);
+        let mut cursor = execute_address(&mut contract, SELECTOR_BALANCE_OF, &address);
+        assert_eq!(cursor.read_u256_be().unwrap(), 0);
 
-        let mut cursor = execute(
-            &mut contract,
-            rust_runtime::contract::op_20::SELECTOR_TOTAL_SUPPLY,
-        );
-        assert_eq!(cursor.read_u256_be().unwrap(), 2 * amount);
+        for _ in 0..3 {
+            execute_address_amount(&mut contract, SELECTOR_MINT, &address, amount);
+        }
 
         let mut cursor = execute_address(&mut contract, SELECTOR_BALANCE_OF, &address);
-        assert_eq!(cursor.read_u256_be().unwrap(), 2 * amount);
+        assert_eq!(cursor.read_u256_be().unwrap(), 3 * amount);
+
+        execute_address_amount(&mut contract, SELECTOR_MINT, &address, amount); // mint more
+
+        let mut cursor = execute_address(&mut contract, SELECTOR_BALANCE_OF, &address);
+        assert_eq!(cursor.read_u256_be().unwrap(), 4 * amount);
+    }
+
+    #[test]
+    fn test_contract_total_supply() {
+        pointer_storage_reset();
+
+        let mut contract = super::Contract::new();
+
+        let address = rust_runtime::tests::random_address();
+
+        let environment = alloc::boxed::Box::new(rust_runtime::blockchain::Environment {
+            deployer: address.clone(),
+            sender: address.clone(),
+            ..random_environment()
+        });
+
+        contract.environment = Some(alloc::boxed::Box::leak(environment));
+        let amount = u256::new(10000000);
+
+        let mut cursor = execute(&mut contract, SELECTOR_TOTAL_SUPPLY);
+        assert_eq!(cursor.read_u256_be().unwrap(), 0);
+
+        for _ in 0..3 {
+            execute_address_amount(&mut contract, SELECTOR_MINT, &address, amount);
+        }
+
+        let mut cursor = execute(&mut contract, SELECTOR_TOTAL_SUPPLY);
+        assert_eq!(cursor.read_u256_be().unwrap(), 3 * amount);
+
+        execute_address_amount(&mut contract, SELECTOR_MINT, &address, amount); // mint more
+
+        let mut cursor = execute(&mut contract, SELECTOR_TOTAL_SUPPLY);
+        assert_eq!(cursor.read_u256_be().unwrap(), 4 * amount);
     }
 }
