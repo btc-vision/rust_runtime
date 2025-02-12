@@ -12,19 +12,9 @@ pub fn random_bytes() -> [u8; 32] {
     result
 }
 
-#[cfg(target_arch = "wasm32")]
-pub fn random_bytes() -> [u8; 32] {
-    [0; 32]
-}
-
 #[cfg(not(target_arch = "wasm32"))]
 pub fn random_u64() -> u64 {
     rand::random()
-}
-
-#[cfg(target_arch = "wasm32")]
-pub fn random_u64() -> u64 {
-    0
 }
 
 pub fn random_address() -> AddressHash {

@@ -5,7 +5,8 @@ use crate::{
 };
 
 #[allow(unused_imports)]
-use spin::{Lazy, Mutex, RwLock};
+#[cfg(not(target_arch = "wasm32"))]
+use spin::{Lazy, Mutex};
 
 /// For test purposes only: This global storage is used to mock the VM’s load/store behavior.
 /// (In production the runtime uses GlobalStore instead.)
@@ -75,4 +76,7 @@ pub fn pointer_storage(data: Option<Map<StorageKey, StorageValue>>, callback: im
     callback();
     let mut storage = STORAGE.lock();
     storage.clear();
+
+    // Variable must by used!!!
+    drop(lock);
 }

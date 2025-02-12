@@ -34,6 +34,11 @@ impl Environment {
             safe_rnd,
         }
     }
+
+    pub fn leak(self) -> Option<&'static Environment> {
+        let leak: &'static Environment = alloc::boxed::Box::leak(alloc::boxed::Box::new(self));
+        Some(leak)
+    }
 }
 
 #[allow(dead_code)]

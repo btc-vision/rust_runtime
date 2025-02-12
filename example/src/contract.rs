@@ -183,7 +183,6 @@ mod tests {
     fn test_contract_name() {
         pointer_storage(None, || {
             let mut contract = super::Contract::new();
-
             let mut cursor = execute(&mut contract, SELECTOR_NAME);
             assert_eq!(contract.params.name, cursor.read_string_with_len().unwrap());
         });
@@ -195,14 +194,12 @@ mod tests {
             let mut contract = super::Contract::new();
 
             let address = rust_runtime::tests::random_address();
-
-            let environment = alloc::boxed::Box::new(rust_runtime::blockchain::Environment {
+            contract.environment = rust_runtime::blockchain::Environment {
                 deployer: address.clone(),
                 sender: address.clone(),
                 ..random_environment()
-            });
-
-            contract.environment = Some(alloc::boxed::Box::leak(environment));
+            }
+            .leak();
             let amount = u256::new(10000000);
 
             let mut cursor = execute_address(&mut contract, SELECTOR_BALANCE_OF, &address);
@@ -229,13 +226,12 @@ mod tests {
 
             let address = rust_runtime::tests::random_address();
 
-            let environment = alloc::boxed::Box::new(rust_runtime::blockchain::Environment {
+            contract.environment = rust_runtime::blockchain::Environment {
                 deployer: address.clone(),
                 sender: address.clone(),
                 ..random_environment()
-            });
-
-            contract.environment = Some(alloc::boxed::Box::leak(environment));
+            }
+            .leak();
             let amount = u256::new(10000000);
 
             let mut cursor = execute(&mut contract, SELECTOR_TOTAL_SUPPLY);
