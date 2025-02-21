@@ -13,6 +13,7 @@ pub mod value;
 pub use key::StorageKey;
 pub use value::StorageValue;
 
+/*
 static GLOBAL_STORE: Lazy<Mutex<Map<StorageKey, StorageValue>>> =
     Lazy::new(|| Mutex::new(Map::new()));
 
@@ -60,3 +61,4 @@ impl GlobalStore {
         }
     }
 }
+     */

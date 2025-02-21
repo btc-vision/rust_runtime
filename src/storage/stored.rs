@@ -1,18 +1,18 @@
 use ethnum::u256;
 
-use super::{GlobalStore, StorageKey, StorageValue};
-use crate::{blockchain::AddressHash, math::abi::encode_pointer};
+use super::{StorageKey, StorageValue};
+use crate::{blockchain::AddressHash, math::abi::encode_pointer, Context};
 use core::convert::Into;
 
 pub trait StoredTrait<T, D>
 where
     D: Into<T>,
 {
-    fn value(&mut self) -> T;
-    fn refresh(&mut self) -> T;
-    fn set(&mut self, value: T) -> T;
-    fn set_no_commit(&mut self, value: T) -> T;
-    fn commit(&mut self);
+    fn value(&mut self, context: &mut impl Context) -> T;
+    fn refresh(&mut self, context: &mut impl Context) -> T;
+    fn set(&mut self, context: &mut impl Context, value: T) -> T;
+    fn set_no_commit(&mut self, context: &mut impl Context, value: T) -> T;
+    fn commit(&mut self, context: &mut impl Context);
 }
 
 pub struct Stored<T, D>
@@ -32,24 +32,25 @@ where
     StorageValue: Into<T>,
     D: Into<T> + Clone,
 {
-    fn value(&mut self) -> T {
+    fn value(&mut self, context: &mut impl Context) -> T {
         if let Some(value) = &self.value {
             *value
         } else {
             self.value = Some(
-                GlobalStore::get(
-                    &self.pointer,
-                    Into::<StorageValue>::into(self.default_value.clone().into()),
-                )
-                .into(),
+                context
+                    .load(
+                        &self.pointer,
+                        Into::<StorageValue>::into(self.default_value.clone().into()),
+                    )
+                    .into(),
             );
             self.value.as_ref().unwrap().clone()
         }
     }
 
-    fn set(&mut self, value: T) -> T {
+    fn set(&mut self, context: &mut impl Context, value: T) -> T {
         if Some(value) != self.value {
-            GlobalStore::set(self.pointer, value.into());
+            context.store(self.pointer, value.into());
             self.value = Some(value);
             value
         } else {
@@ -57,8 +58,8 @@ where
         }
     }
 
-    fn refresh(&mut self) -> T {
-        let value = GlobalStore::get(
+    fn refresh(&mut self, context: &mut impl Context) -> T {
+        let value = context.load(
             &self.pointer,
             Into::<StorageValue>::into(self.default_value.clone().into()),
         );
@@ -71,9 +72,9 @@ where
         value
     }
 
-    fn commit(&mut self) {
+    fn commit(&mut self, context: &mut impl Context) {
         if let Some(value) = self.value {
-            GlobalStore::set(self.pointer, value.into());
+            context.store(self.pointer, value.into());
         }
     }
 }

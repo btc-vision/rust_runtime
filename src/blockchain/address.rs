@@ -1,7 +1,6 @@
-
 use crate::storage::StorageKey;
 
-#[derive(Clone, Copy, Eq, PartialEq)]
+#[derive(Clone, Copy, Eq, PartialEq, Debug)]
 pub struct AddressHash {
     pub bytes: [u8; crate::constant::ADDRESS_BYTE_LENGTH],
 }

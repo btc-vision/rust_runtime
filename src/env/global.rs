@@ -1,5 +1,6 @@
 #[cfg(target_arch = "wasm32")]
 use crate::mem::WaPtr;
+use crate::storage::map::Map;
 
 #[cfg(target_arch = "wasm32")]
 #[link(wasm_import_module = "env")]
@@ -28,6 +29,8 @@ extern "C" {
     #[allow(dead_code)]
     pub fn validateBitcoinAddress(ptr: WaPtr) -> WaPtr;
     #[allow(dead_code)]
+    pub fn verifySchnorrSignature(ptr: WaPtr) -> WaPtr;
+    #[allow(dead_code)]
     pub fn sha256(ptr: WaPtr) -> WaPtr;
     #[allow(dead_code)]
     pub fn ripemd160(ptr: WaPtr) -> WaPtr;
@@ -36,3 +39,33 @@ extern "C" {
     #[allow(dead_code)]
     pub fn outputs() -> WaPtr;
 }
+
+#[cfg(target_arch = "wasm32")]
+pub struct GlobalMethods {
+    store: Map<StorageKey, StorageValue>,
+}
+
+#[cfg(target_arch = "wasm32")]
+impl GlobalMethods {
+    pub const fn new() {
+        Self { store: Map::new() }
+    }
+}
+
+#[cfg(target_arch = "wasm32")]
+impl super::EnvMethods for GlobalMethods {
+    fn log(&self, text: &str) {
+        unsafe {
+            if let Ok(string) = WaBuffer::from_str(text) {
+                log(string.ptr());
+            }
+        }
+    }
+
+    fn emit(buffer: crate::WaBuffer) {
+        unsafe { emit(buffer.ptr()) }
+    }
+}
+
+#[cfg(target_arch = "wasm32")]
+pub static GLOBAL_METHODS: GlobalMethods = GlobalMethods::new();

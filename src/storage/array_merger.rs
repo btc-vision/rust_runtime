@@ -1,8 +1,8 @@
 use alloc::vec::Vec;
 
-use crate::{math::abi::encode_pointer, storage::StorageKey};
+use crate::{math::abi::encode_pointer, storage::StorageKey, Context};
 
-use super::{GlobalStore, StorageValue};
+use super::StorageValue;
 
 #[derive(Clone, Eq, PartialEq)]
 pub struct ArrayMerger {
@@ -19,19 +19,19 @@ impl ArrayMerger {
             default_value,
         }
     }
-    pub fn get(&mut self, key: &[u8]) -> StorageValue {
-        let key = self.get_key_hash(key);
-        GlobalStore::get(&key, self.default_value)
+    pub fn get<'a>(&mut self, context: &mut impl Context<'a>, key: &[u8]) -> StorageValue {
+        let pointer = self.get_key_hash(key);
+        context.load(&pointer, self.default_value)
     }
 
-    pub fn set(&mut self, key: &[u8], value: StorageValue) {
-        let key = self.get_key_hash(key);
-        GlobalStore::set(key, value);
+    pub fn set<'a>(&mut self, context: &mut impl Context<'a>, key: &[u8], value: StorageValue) {
+        let pointer = self.get_key_hash(key);
+        context.store(pointer, value);
     }
 
-    pub fn contains_key(&self, key: &[u8]) -> bool {
+    pub fn contains_key<'a>(&self, context: &mut impl Context<'a>, key: &[u8]) -> bool {
         let key = self.get_key_hash(key);
-        GlobalStore::has_key(&key)
+        context.exists(&key)
     }
 
     fn get_key_hash(&self, key: &[u8]) -> StorageKey {

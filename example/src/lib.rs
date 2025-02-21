@@ -6,7 +6,7 @@ use rust_runtime::prelude::{ContractTrait, WaBuffer, WaPtr};
 pub mod contract;
 
 #[allow(dead_code, static_mut_refs)]
-static mut CONTRACT: contract::Contract = contract::Contract::new();
+static mut CONTRACT: contract::Contract = contract::Contract::new(rust_runtime::GLOBAL_METHODS);
 
 #[cfg(target_arch = "wasm32")]
 use lol_alloc::LeakingPageAllocator;

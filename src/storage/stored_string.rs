@@ -1,8 +1,8 @@
 use alloc::string::String;
 
-use crate::{constant::STORE_VALUE_SIZE, storage::StorageValue};
+use crate::{constant::STORE_VALUE_SIZE, storage::StorageValue, Context};
 
-use super::{stored::StoredTrait, GlobalStore};
+use super::stored::StoredTrait;
 
 pub struct StoredString {
     pointer: u16,
@@ -27,7 +27,7 @@ impl StoredString {
         }
     }
 
-    fn save(&mut self, value: String) -> String {
+    fn save(&mut self, context: &mut impl Context, value: String) -> String {
         let bytes = value.as_bytes();
         let mut remaining = bytes.len();
         let mut offset = [0u8; crate::constant::STORE_VALUE_SIZE];
@@ -39,7 +39,7 @@ impl StoredString {
         data[4..4 + remaining.min(28)].copy_from_slice(&bytes[0..length]);
         let key = crate::math::abi::encode_pointer(self.pointer, &offset);
         remaining -= length;
-        GlobalStore::set(key, data.into());
+        context.store(key, data.into());
 
         while remaining > 0 {
             length = remaining.min(crate::constant::STORE_VALUE_SIZE);
@@ -55,15 +55,15 @@ impl StoredString {
             remaining -= length;
 
             let key = crate::math::abi::encode_pointer(self.pointer, &offset);
-            GlobalStore::set(key, data.into());
+            context.store(key, data.into());
         }
         self.value = Some(value.clone());
         value
     }
 
-    fn load(&mut self) -> String {
+    fn load(&mut self, context: &mut impl Context) -> String {
         let mut offset = [0u8; crate::constant::STORE_VALUE_SIZE];
-        let header = GlobalStore::get(
+        let header = context.load(
             &crate::math::abi::encode_pointer(self.pointer, &offset),
             StorageValue::ZERO,
         );
@@ -79,7 +79,7 @@ impl StoredString {
         while remaining > 0 {
             offset[crate::constant::STORE_KEY_SIZE - 1] += 1;
             let key = crate::math::abi::encode_pointer(self.pointer, &offset);
-            let tmp = GlobalStore::get(&key, StorageValue::ZERO);
+            let tmp = context.load(&key, StorageValue::ZERO);
             let bytes = tmp.bytes();
             length = remaining.min(crate::constant::STORE_VALUE_SIZE);
             for &byte in bytes.iter().take(length) {
@@ -98,15 +98,15 @@ impl StoredString {
 }
 
 impl StoredTrait<String, &'static str> for StoredString {
-    fn set(&mut self, value: String) -> String {
-        self.save(value)
+    fn set(&mut self, context: &mut impl Context, value: String) -> String {
+        self.save(context, value)
     }
 
-    fn value(&mut self) -> String {
+    fn value(&mut self, context: &mut impl Context) -> String {
         if let Some(value) = &self.value {
             value.clone()
         } else {
-            self.load()
+            self.load(context)
         }
     }
 
@@ -115,13 +115,13 @@ impl StoredTrait<String, &'static str> for StoredString {
         value
     }
 
-    fn commit(&mut self) {
+    fn commit(&mut self, context: &mut impl Context) {
         if let Some(value) = &self.value {
-            self.save(value.clone());
+            self.save(context, value.clone());
         }
     }
 
-    fn refresh(&mut self) -> String {
-        self.load()
+    fn refresh(&mut self, context: &mut impl Context) -> String {
+        self.load(context)
     }
 }

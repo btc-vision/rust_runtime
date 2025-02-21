@@ -10,22 +10,23 @@ use rust_runtime::{
         StorageValue,
     },
     types::{CallData, Selector},
-    ContractTrait, OP20Trait,
+    ContractTrait, EnvMethods, OP20Trait,
 };
 
 const SELECTOR_AIRDROP: Selector = encode_selector_const("airdrop");
 const SELECTOR_AIRDROP_WITH_AMOUNT: Selector = encode_selector_const("airdropWithAmount");
 const SELECTOR_MINT: Selector = encode_selector_const("mint");
 
-pub struct Contract {
-    environment: Option<&'static rust_runtime::blockchain::Environment>,
+pub struct Contract<'a> {
+    environment: Option<&'a rust_runtime::blockchain::Environment>,
     params: rust_runtime::contract::op_20::OP20Params,
     balance_of_map: StoredMap<AddressHash, u256>,
     allowance_map: MultiAddressMemoryMap,
     total_supply: StoredU256,
+    methods: &'a impl EnvMethods,
 }
-impl Contract {
-    pub const fn new() -> Self {
+impl<'a> Contract<'a> {
+    pub const fn new(methods: &'a impl EnvMethods) -> Self {
         Self {
             environment: None,
             params: rust_runtime::contract::op_20::OP20Params {
@@ -43,6 +44,7 @@ impl Contract {
                 StorageValue::ZERO,
             ),
             total_supply: StoredU256::new_const(Pointer::TotalSupply.u16(), u256::ZERO),
+            methods,
         }
     }
 }
@@ -181,73 +183,70 @@ mod tests {
 
     #[test]
     fn test_contract_name() {
-        pointer_storage(None, || {
-            let mut contract = super::Contract::new();
-            let mut cursor = execute(&mut contract, SELECTOR_NAME);
-            assert_eq!(contract.params.name, cursor.read_string_with_len().unwrap());
-        });
+        let local_methods = rust_runtime::env::LocalMethods::new();
+        let mut contract = super::Contract::new(&local_methods);
+        let mut cursor = execute(&mut contract, SELECTOR_NAME);
+        assert_eq!(contract.params.name, cursor.read_string_with_len().unwrap());
     }
 
     #[test]
     fn test_contract_mint() {
-        pointer_storage(None, || {
-            let mut contract = super::Contract::new();
+        let local_methods = rust_runtime::env::LocalMethods::new();
+        let mut contract = super::Contract::new(&local_methods);
 
-            let address = rust_runtime::tests::random_address();
-            contract.environment = rust_runtime::blockchain::Environment {
-                deployer: address.clone(),
-                sender: address.clone(),
-                ..random_environment()
-            }
-            .leak();
-            let amount = u256::new(10000000);
+        let address = rust_runtime::tests::random_address();
+        contract.environment = rust_runtime::blockchain::Environment {
+            deployer: address.clone(),
+            sender: address.clone(),
+            ..random_environment()
+        }
+        .leak();
+        let amount = u256::new(10000000);
 
-            let mut cursor = execute_address(&mut contract, SELECTOR_BALANCE_OF, &address);
-            assert_eq!(cursor.read_u256_be().unwrap(), 0);
+        let mut cursor = execute_address(&mut contract, SELECTOR_BALANCE_OF, &address);
+        assert_eq!(cursor.read_u256_be().unwrap(), 0);
 
-            for _ in 0..3 {
-                execute_address_amount(&mut contract, SELECTOR_MINT, &address, amount);
-            }
+        for _ in 0..3 {
+            execute_address_amount(&mut contract, SELECTOR_MINT, &address, amount);
+        }
 
-            let mut cursor = execute_address(&mut contract, SELECTOR_BALANCE_OF, &address);
-            assert_eq!(cursor.read_u256_be().unwrap(), 3 * amount);
+        let mut cursor = execute_address(&mut contract, SELECTOR_BALANCE_OF, &address);
+        assert_eq!(cursor.read_u256_be().unwrap(), 3 * amount);
 
-            execute_address_amount(&mut contract, SELECTOR_MINT, &address, amount); // mint more
+        execute_address_amount(&mut contract, SELECTOR_MINT, &address, amount); // mint more
 
-            let mut cursor = execute_address(&mut contract, SELECTOR_BALANCE_OF, &address);
-            assert_eq!(cursor.read_u256_be().unwrap(), 4 * amount);
-        });
+        let mut cursor = execute_address(&mut contract, SELECTOR_BALANCE_OF, &address);
+        assert_eq!(cursor.read_u256_be().unwrap(), 4 * amount);
     }
 
     #[test]
     fn test_contract_total_supply() {
-        pointer_storage(None, || {
-            let mut contract = super::Contract::new();
+        let local_methods = rust_runtime::env::LocalMethods::new();
+        let mut contract = super::Contract::new(&local_methods);
 
-            let address = rust_runtime::tests::random_address();
+        let address = rust_runtime::tests::random_address();
 
-            contract.environment = rust_runtime::blockchain::Environment {
-                deployer: address.clone(),
-                sender: address.clone(),
-                ..random_environment()
-            }
-            .leak();
-            let amount = u256::new(10000000);
+        contract.environment = rust_runtime::blockchain::Environment {
+            deployer: address.clone(),
+            sender: address.clone(),
+            ..random_environment()
+        }
+        .leak();
+        let amount = u256::new(10000000);
 
-            let mut cursor = execute(&mut contract, SELECTOR_TOTAL_SUPPLY);
-            assert_eq!(cursor.read_u256_be().unwrap(), 0);
+        let mut cursor = execute(&mut contract, SELECTOR_TOTAL_SUPPLY);
+        assert_eq!(cursor.read_u256_be().unwrap(), 0);
 
-            for _ in 0..3 {
-                execute_address_amount(&mut contract, SELECTOR_MINT, &address, amount);
-            }
+        for _ in 0..3 {
+            execute_address_amount(&mut contract, SELECTOR_MINT, &address, amount);
+        }
 
-            let mut cursor = execute(&mut contract, SELECTOR_TOTAL_SUPPLY);
-            assert_eq!(cursor.read_u256_be().unwrap(), 3 * amount);
+        let mut cursor = execute(&mut contract, SELECTOR_TOTAL_SUPPLY);
+        assert_eq!(cursor.read_u256_be().unwrap(), 3 * amount);
 
-            execute_address_amount(&mut contract, SELECTOR_MINT, &address, amount); // mint more
+        execute_address_amount(&mut contract, SELECTOR_MINT, &address, amount); // mint more
 
-            let mut cursor = execute(&mut contract, SELECTOR_TOTAL_SUPPLY);
-            assert_eq!(cursor.read_u256_be().unwrap(), 4 * amount);
-        });
+        let mut cursor = execute(&mut contract, SELECTOR_TOTAL_SUPPLY);
+        assert_eq!(cursor.read_u256_be().unwrap(), 4 * amount);
     }
 }

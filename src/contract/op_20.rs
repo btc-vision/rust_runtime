@@ -3,6 +3,7 @@ use ethnum::u256;
 use crate::{
     blockchain::AddressHash,
     constant::ADDRESS_BYTE_LENGTH,
+    env::Context,
     math::abi::encode_selector_const,
     storage::{
         multi_address_map::MultiAddressMemoryMap,
@@ -134,7 +135,7 @@ pub trait OP20Trait: super::ContractTrait {
 
     fn allowance_base(&mut self, owner: &AddressHash, spender: &AddressHash) -> u256 {
         let mut sender_map = self.allowance_map().get(owner);
-        sender_map.get(&spender.bytes).u256()
+        sender_map.get(self.context(), &spender.bytes).u256()
     }
 
     fn allowance(
@@ -166,9 +167,9 @@ pub trait OP20Trait: super::ContractTrait {
         }
 
         let mut sender_map = self.allowance_map().get(owner);
-        sender_map.set(&spender.bytes, value.into());
+        sender_map.set(self.context(), &spender.bytes, value.into());
 
-        Self::create_approve_event(*owner, *spender, value)?;
+        self.create_approve_event(*owner, *spender, value)?;
 
         Ok(true)
     }
@@ -186,7 +187,9 @@ pub trait OP20Trait: super::ContractTrait {
     }
 
     fn balance_of_base(&mut self, address: &AddressHash) -> u256 {
-        self.balance_of_map().get(address, u256::ZERO).into()
+        self.balance_of_map()
+            .get(self.context(), address, u256::ZERO)
+            .into()
     }
 
     fn balance_of(
@@ -216,19 +219,24 @@ pub trait OP20Trait: super::ContractTrait {
         }
 
         let sender = self.environment().sender;
-        if !self.balance_of_map().contains_key(&sender) {
+        if !self.balance_of_map().contains_key(self.context(), &sender) {
             return Err(crate::error::Error::NoBalance);
         }
 
-        let balance: u256 = self.balance_of_map().get(&sender, u256::ZERO).u256();
+        let balance: u256 = self
+            .balance_of_map()
+            .get(self.context(), &sender, u256::ZERO)
+            .u256();
         if balance < value {
             return Err(crate::error::Error::InsufficientBalance);
         }
 
         let new_balance = balance - value;
-        self.balance_of_map().set(&sender, new_balance);
+        self.balance_of_map()
+            .set(self.context(), &sender, new_balance);
+        let value = self.total_supply().set(total_supply - value);
 
-        Self::create_burn_event(self.total_supply().set(total_supply - value))?;
+        self.create_burn_event(value)?;
 
         Ok(true)
     }
@@ -255,11 +263,15 @@ pub trait OP20Trait: super::ContractTrait {
             self.only_deployer(&self.environment().sender)?;
         }
 
-        if !self.balance_of_map().contains_key(to) {
-            self.balance_of_map().set(to, value);
+        if !self.balance_of_map().contains_key(self.context(), to) {
+            self.balance_of_map().set(self.context(), to, value);
         } else {
-            let to_balance = self.balance_of_map().get(to, u256::ZERO).u256();
-            self.balance_of_map().set(to, to_balance + value);
+            let to_balance = self
+                .balance_of_map()
+                .get(self.context(), to, u256::ZERO)
+                .u256();
+            self.balance_of_map()
+                .set(self.context(), to, to_balance + value);
         }
 
         let old = self.total_supply().value();
@@ -270,7 +282,7 @@ pub trait OP20Trait: super::ContractTrait {
         }
         self.total_supply().set(new);
 
-        Self::create_mint_event(*to, value)?;
+        self.create_mint_event(*to, value)?;
 
         Ok(true)
     }
@@ -289,19 +301,26 @@ pub trait OP20Trait: super::ContractTrait {
             return Err(crate::error::Error::CannotTransferZeroTokens);
         }
 
-        let balance = self.balance_of_map().get(&sender, u256::ZERO).u256();
+        let balance = self
+            .balance_of_map()
+            .get(self.context(), &sender, u256::ZERO)
+            .u256();
 
         if balance < value {
             return Err(crate::error::Error::InsufficientBalance);
         }
         let new_balance = balance - value;
-        self.balance_of_map().set(&sender, new_balance);
+        self.balance_of_map()
+            .set(self.context(), &sender, new_balance);
 
-        let balance = self.balance_of_map().get(to, u256::ZERO).u256();
+        let balance = self
+            .balance_of_map()
+            .get(self.context(), to, u256::ZERO)
+            .u256();
         let new_balance = balance + value;
-        self.balance_of_map().set(to, new_balance);
+        self.balance_of_map().set(self.context(), to, new_balance);
 
-        Self::create_transfer_event(sender, *to, value)?;
+        self.create_transfer_event(sender, *to, value)?;
         Ok(true)
     }
 
@@ -326,14 +345,16 @@ pub trait OP20Trait: super::ContractTrait {
         value: u256,
     ) -> Result<(), crate::error::Error> {
         let mut deployer_allowance_map = self.allowance_map().get(deployer);
-        let allowed: u256 = deployer_allowance_map.get(&spender.bytes).u256();
+        let allowed: u256 = deployer_allowance_map
+            .get(self.context(), &spender.bytes)
+            .u256();
 
         if allowed < value {
             return Err(crate::error::Error::InsufficientAllowance);
         }
 
         let new_allowance = allowed - value;
-        deployer_allowance_map.set(&spender.bytes, new_allowance.into());
+        deployer_allowance_map.set(self.context(), &spender.bytes, new_allowance.into());
         self.allowance_map().set(*deployer, deployer_allowance_map);
         Ok(())
     }
@@ -344,23 +365,30 @@ pub trait OP20Trait: super::ContractTrait {
         to: &AddressHash,
         value: u256,
     ) -> Result<bool, crate::error::Error> {
-        let balance: u256 = self.balance_of_map().get(from, u256::ZERO).u256();
+        let balance: u256 = self
+            .balance_of_map()
+            .get(self.context(), from, u256::ZERO)
+            .u256();
         if balance < value {
             return Err(crate::error::Error::InsufficientBalance);
         }
 
         let new_balance = balance - value;
-        self.balance_of_map().set(from, new_balance);
+        self.balance_of_map().set(self.context(), from, new_balance);
 
-        if !self.balance_of_map().contains_key(to) {
-            self.balance_of_map().set(to, value);
+        if !self.balance_of_map().contains_key(self.context(), to) {
+            self.balance_of_map().set(self.context(), to, value);
         } else {
-            let to_balance: u256 = self.balance_of_map().get(to, u256::ZERO).u256();
+            let to_balance: u256 = self
+                .balance_of_map()
+                .get(self.context(), to, u256::ZERO)
+                .u256();
             let new_to_balance = to_balance + value;
-            self.balance_of_map().set(to, new_to_balance);
+            self.balance_of_map()
+                .set(self.context(), to, new_to_balance);
         }
 
-        Self::create_transfer_event(*from, *to, value)?;
+        self.create_transfer_event(*from, *to, value)?;
 
         Ok(true)
     }
@@ -395,32 +423,38 @@ pub trait OP20Trait: super::ContractTrait {
         Ok(response)
     }
 
-    fn create_burn_event(value: u256) -> Result<(), crate::error::Error> {
+    fn create_burn_event(&mut self, value: u256) -> Result<(), crate::error::Error> {
         let burn_event = crate::event::Event::burn(value)?;
 
-        Self::emit(&burn_event)
+        Ok(self.context().emit(&burn_event))
     }
 
     fn create_approve_event(
+        &self,
         deployer: AddressHash,
         spender: AddressHash,
         value: u256,
     ) -> Result<(), crate::error::Error> {
         let approve_event = crate::event::Event::approve(deployer, spender, value)?;
-        Self::emit(&approve_event)
+        Ok(self.context().emit(&approve_event))
     }
 
-    fn create_mint_event(deployer: AddressHash, amount: u256) -> Result<(), crate::error::Error> {
+    fn create_mint_event(
+        &mut self,
+        deployer: AddressHash,
+        amount: u256,
+    ) -> Result<(), crate::error::Error> {
         let mint_event = crate::event::Event::mint(deployer, amount)?;
-        Self::emit(&mint_event)
+        Ok(self.context().emit(&mint_event))
     }
 
     fn create_transfer_event(
+        &mut self,
         from: AddressHash,
         to: AddressHash,
         amount: u256,
     ) -> Result<(), crate::error::Error> {
         let transfer_event = crate::event::Event::transfer(from, to, amount)?;
-        Self::emit(&transfer_event)
+        Ok(self.context().emit(&transfer_event))
     }
 }
