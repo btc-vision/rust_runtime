@@ -8,7 +8,7 @@ use core::str::FromStr;
 
 mod global;
 mod test;
-pub use test::TestContext;
+pub use test::{Network, TestContext};
 
 #[cfg(target_arch = "wasm32")]
 pub use global::GLOBAL_METHODS;

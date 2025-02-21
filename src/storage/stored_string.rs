@@ -27,7 +27,7 @@ impl StoredString {
         }
     }
 
-    fn save(&mut self, context: &mut impl Context, value: String) -> String {
+    fn save<'a>(&mut self, context: &mut impl Context<'a>, value: String) -> String {
         let bytes = value.as_bytes();
         let mut remaining = bytes.len();
         let mut offset = [0u8; crate::constant::STORE_VALUE_SIZE];
@@ -61,7 +61,7 @@ impl StoredString {
         value
     }
 
-    fn load(&mut self, context: &mut impl Context) -> String {
+    fn load<'a>(&mut self, context: &mut impl Context<'a>) -> String {
         let mut offset = [0u8; crate::constant::STORE_VALUE_SIZE];
         let header = context.load(
             &crate::math::abi::encode_pointer(self.pointer, &offset),
@@ -98,11 +98,11 @@ impl StoredString {
 }
 
 impl StoredTrait<String, &'static str> for StoredString {
-    fn set(&mut self, context: &mut impl Context, value: String) -> String {
+    fn set<'a>(&mut self, context: &mut impl Context<'a>, value: String) -> String {
         self.save(context, value)
     }
 
-    fn value(&mut self, context: &mut impl Context) -> String {
+    fn value<'a>(&mut self, context: &mut impl Context<'a>) -> String {
         if let Some(value) = &self.value {
             value.clone()
         } else {
@@ -115,13 +115,13 @@ impl StoredTrait<String, &'static str> for StoredString {
         value
     }
 
-    fn commit(&mut self, context: &mut impl Context) {
+    fn commit<'a>(&mut self, context: &mut impl Context<'a>) {
         if let Some(value) = &self.value {
             self.save(context, value.clone());
         }
     }
 
-    fn refresh(&mut self, context: &mut impl Context) -> String {
+    fn refresh<'a>(&mut self, context: &mut impl Context<'a>) -> String {
         self.load(context)
     }
 }

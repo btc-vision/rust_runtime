@@ -13,12 +13,30 @@ pub enum Network {
 }
 
 pub struct TestContext {
-    pub newtork: Network,
+    pub network: Network,
     pub events: alloc::vec::Vec<crate::event::Event>,
     pub global_store: Map<StorageKey, StorageValue>,
     pub cache_store: Map<StorageKey, StorageValue>,
     pub inputs: alloc::vec::Vec<crate::blockchain::transaction::Input>,
     pub outputs: alloc::vec::Vec<crate::blockchain::transaction::Output>,
+}
+
+impl TestContext {
+    pub fn new(
+        network: Network,
+        global_store: Map<StorageKey, StorageValue>,
+        inputs: alloc::vec::Vec<crate::blockchain::transaction::Input>,
+        outputs: alloc::vec::Vec<crate::blockchain::transaction::Output>,
+    ) -> Self {
+        Self {
+            network,
+            events: alloc::vec::Vec::new(),
+            global_store,
+            cache_store: Map::new(),
+            inputs,
+            outputs,
+        }
+    }
 }
 
 impl<'a> super::Context<'a> for TestContext {
@@ -66,10 +84,10 @@ impl<'a> super::Context<'a> for TestContext {
             match self.global_store.get(&pointer) {
                 Some(result) => {
                     if StorageValue::ZERO.eq(result) && default_value != StorageValue::ZERO {
-                        self.cache_store.insert(pointer, default_value);
+                        self.cache_store.insert(*pointer, default_value);
                         default_value
                     } else {
-                        self.cache_store.insert(pointer, *result);
+                        self.cache_store.insert(*pointer, *result);
                         *result
                     }
                 }

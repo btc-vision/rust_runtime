@@ -87,7 +87,7 @@ pub trait OP20Trait: super::ContractTrait {
             SELECTOR_TOTAL_SUPPLY => {
                 let mut buffer = WaBuffer::new(32, 1)?;
                 let mut cursor = buffer.cursor();
-                cursor.write_u256_be(&self.total_supply().value())?;
+                cursor.write_u256_be(&self.total_supply().value(self.context()))?;
                 Ok(buffer)
             }
             SELECTOR_MAXIMUM_SUPPLY => {
@@ -117,10 +117,10 @@ pub trait OP20Trait: super::ContractTrait {
     fn total_supply(&mut self) -> &mut StoredU256;
 
     fn max_supply(&mut self) -> u256 {
-        self.params().max_supply.value()
+        self.params().max_supply.value(self.context())
     }
     fn decimals(&mut self) -> u8 {
-        self.params().decimals.value()
+        self.params().decimals.value(self.context())
     }
 
     fn name(&mut self) -> &'static str {
@@ -213,7 +213,7 @@ pub trait OP20Trait: super::ContractTrait {
             self.only_deployer(&self.environment().sender)?;
         }
 
-        let total_supply = self.total_supply().value();
+        let total_supply = self.total_supply().value(self.context());
         if total_supply < value {
             return Err(crate::error::Error::InsufficientTotalSupply);
         }
@@ -234,7 +234,9 @@ pub trait OP20Trait: super::ContractTrait {
         let new_balance = balance - value;
         self.balance_of_map()
             .set(self.context(), &sender, new_balance);
-        let value = self.total_supply().set(total_supply - value);
+        let value = self
+            .total_supply()
+            .set(self.context(), total_supply - value);
 
         self.create_burn_event(value)?;
 
@@ -274,13 +276,13 @@ pub trait OP20Trait: super::ContractTrait {
                 .set(self.context(), to, to_balance + value);
         }
 
-        let old = self.total_supply().value();
+        let old = self.total_supply().value(self.context());
         let new = old + value;
 
         if new > self.max_supply() {
             return Err(crate::error::Error::MaxSupplyReached);
         }
-        self.total_supply().set(new);
+        self.total_supply().set(self.context(), new);
 
         self.create_mint_event(*to, value)?;
 
