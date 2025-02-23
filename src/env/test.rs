@@ -1,3 +1,5 @@
+use core::ptr::NonNull;
+
 use libc_print::libc_println;
 
 use crate::{
@@ -14,9 +16,9 @@ pub enum Network {
 
 pub struct TestContext {
     pub network: Network,
-    pub events: alloc::vec::Vec<crate::event::Event>,
-    pub global_store: Map<StorageKey, StorageValue>,
-    pub cache_store: Map<StorageKey, StorageValue>,
+    pub events: NonNull<alloc::vec::Vec<crate::event::Event>>,
+    pub global_store: NonNull<Map<StorageKey, StorageValue>>,
+    pub cache_store: NonNull<Map<StorageKey, StorageValue>>,
     pub inputs: alloc::vec::Vec<crate::blockchain::transaction::Input>,
     pub outputs: alloc::vec::Vec<crate::blockchain::transaction::Output>,
 }
@@ -30,7 +32,7 @@ impl TestContext {
     ) -> Self {
         Self {
             network,
-            events: alloc::vec::Vec::new(),
+            events: NonNull::new(alloc::vec::Vec::new()).unwrap(),
             global_store,
             cache_store: Map::new(),
             inputs,

@@ -58,7 +58,7 @@ where
         }
     }
 
-    fn refresh<'a>(&mut self, context: &mut impl Context<'a>) -> T {
+    fn refresh<'a>(&mut self, context: &impl Context<'a>) -> T {
         let value = context.load(
             &self.pointer,
             Into::<StorageValue>::into(self.default_value.clone().into()),

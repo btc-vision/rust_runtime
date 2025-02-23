@@ -7,7 +7,7 @@ pub trait ContractTrait {
 
     fn environment(&self) -> &'static crate::blockchain::Environment;
 
-    fn context(&self) -> &mut impl crate::env::Context;
+    fn context<'b>(&mut self) -> &'b impl crate::env::Context;
 
     fn is_self(&self, address: &AddressHash) -> bool {
         address.eq(&self.environment().address)

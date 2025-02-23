@@ -52,15 +52,15 @@ pub fn rimemd160(data: &[u8]) -> &'static [u8] {
 
 pub trait Context<'a> {
     fn log(&self, text: &str);
-    fn emit(&mut self, event: &impl crate::event::EventTrait);
+    fn emit(&self, event: &impl crate::event::EventTrait);
     fn call(&self, buffer: WaBuffer) -> WaBuffer;
 
     fn deploy(&self, buffer: WaBuffer) -> WaBuffer;
     fn deploy_from_address(&self, buffer: WaBuffer) -> WaBuffer;
 
-    fn load(&mut self, pointer: &StorageKey, default: StorageValue) -> StorageValue;
-    fn store(&mut self, pointer: StorageKey, value: StorageValue);
-    fn exists(&mut self, pointer: &StorageKey) -> bool;
+    fn load(&self, pointer: &StorageKey, default: StorageValue) -> StorageValue;
+    fn store(&self, pointer: StorageKey, value: StorageValue);
+    fn exists(&self, pointer: &StorageKey) -> bool;
     fn next_pointer_greater_than(&self, pointer: StorageKey) -> StorageKey;
 
     fn encode_address(&self, address: &str) -> &'a [u8];
