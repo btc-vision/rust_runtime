@@ -16,7 +16,7 @@ pub trait ContractTrait<'a> {
 
     fn environment(&self) -> &'a crate::blockchain::Environment;
 
-    fn context(&self) -> Rc<RefCell<dyn crate::env::Context>>;
+    fn context(&self) -> Rc<RefCell<dyn Context>>;
 
     fn is_self(&self, address: &AddressHash) -> bool {
         address.eq(&self.environment().address)

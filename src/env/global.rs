@@ -4,6 +4,7 @@ use crate::{
     WaBuffer,
 };
 use core::str::FromStr;
+use ethnum::u256;
 
 //#[cfg(target_arch = "wasm32")]
 #[link(wasm_import_module = "env")]
@@ -75,7 +76,7 @@ impl super::Context for GlobalContext {
         unsafe { WaBuffer::from_raw(call(buffer.ptr())) }
     }
 
-    fn encode_address(&self, address: &str) -> &'static [u8] {
+    fn encode_address(&self, _address: &str) -> &'static [u8] {
         b"abcd"
     }
 
@@ -87,11 +88,11 @@ impl super::Context for GlobalContext {
         unsafe { WaBuffer::from_raw(deployFromAddress(buffer.ptr())) }
     }
 
-    fn validate_bitcoin_address(&self, address: &str) -> bool {
+    fn validate_bitcoin_address(&self, _address: &str) -> bool {
         false
     }
 
-    fn verify_schnorr_signature(&self, data: &[u8]) -> bool {
+    fn verify_schnorr_signature(&self, _data: &[u8]) -> bool {
         false
     }
 
@@ -130,7 +131,7 @@ impl super::Context for GlobalContext {
     }
 
     fn next_pointer_greater_than(&self, pointer: StorageKey) -> StorageKey {
-        [0; 32]
+        (u256::from_le_bytes(pointer) + 1).to_le_bytes()
     }
 
     fn inputs(&self) -> alloc::vec::Vec<crate::blockchain::transaction::Input> {

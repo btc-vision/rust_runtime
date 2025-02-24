@@ -1,7 +1,10 @@
 #![no_std]
 extern crate alloc;
 
+#[allow(unused_imports)]
 use alloc::rc::Rc;
+
+#[allow(unused_imports)]
 use core::cell::RefCell;
 
 #[allow(unused_imports)]

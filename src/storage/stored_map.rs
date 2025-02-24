@@ -9,7 +9,7 @@ use alloc::rc::Rc;
 pub struct StoredMap<K, V>
 where
     K: Into<StorageKey>,
-    V: Into<StorageValue>,
+    V: Into<StorageValue> + Clone,
 {
     context: Rc<RefCell<dyn Context>>,
     default: V,
@@ -40,14 +40,14 @@ where
         self.context.borrow_mut().store(key_hash, value);
     }
 
-    pub fn get(&self, key: &K, default_value: V) -> V {
+    pub fn get(&self, key: &K) -> V {
         let key: StorageKey = (*key).into();
         let key_hash = encode_pointer(self.pointer, &key);
         self.context
             .borrow_mut()
             .load(&key_hash)
             .map(|value| V::from(value))
-            .unwrap_or_else(|| default_value)
+            .unwrap_or(self.default.clone())
     }
 
     pub fn contains_key(&self, key: &K) -> bool {

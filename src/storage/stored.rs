@@ -153,55 +153,48 @@ mod tests {
     #[test]
     fn test_bool() {
         let mut stored_bool = super::StoredBool::new_const(context(), 0, false);
-        let mut context = context();
         stored_bool.set(true);
         assert_eq!(stored_bool.refresh(), true)
     }
 
     #[test]
     fn test_u8() {
-        let mut context = context();
-        let mut stored_u8 = super::StoredU8::new_const(context, 0, 0);
+        let mut stored_u8 = super::StoredU8::new_const(context(), 0, 0);
         stored_u8.set(1);
         assert_eq!(stored_u8.refresh(), 1)
     }
 
     #[test]
     fn test_u16() {
-        let context = context();
-        let mut stored_u16 = super::StoredU16::new_const(context, 0, 0);
+        let mut stored_u16 = super::StoredU16::new_const(context(), 0, 0);
         stored_u16.set(123);
         assert_eq!(stored_u16.refresh(), 123)
     }
 
     #[test]
     fn test_u32() {
-        let mut context = context();
-        let mut stored_u32 = super::StoredU32::new_const(context, 0, 0);
+        let mut stored_u32 = super::StoredU32::new_const(context(), 0, 0);
         stored_u32.set(123);
         assert_eq!(stored_u32.refresh(), 123)
     }
 
     #[test]
     fn test_u64() {
-        let mut context = context();
-        let mut stored_u64 = super::StoredU64::new_const(context, 0, 0);
+        let mut stored_u64 = super::StoredU64::new_const(context(), 0, 0);
         stored_u64.set(123);
         assert_eq!(stored_u64.refresh(), 123)
     }
 
     #[test]
     fn test_u128() {
-        let mut context = context();
-        let mut stored_u128 = super::StoredU128::new_const(context, 0, 0);
+        let mut stored_u128 = super::StoredU128::new_const(context(), 0, 0);
         stored_u128.set(123);
         assert_eq!(stored_u128.refresh(), 123)
     }
 
     #[test]
     fn test_u256() {
-        let mut context = context();
-        let mut stored_u256 = super::StoredU256::new_const(context, 0, u256::new(0));
+        let mut stored_u256 = super::StoredU256::new_const(context(), 0, u256::new(0));
         stored_u256.set(u256::new(123));
         assert_eq!(stored_u256.refresh(), u256::new(123))
     }

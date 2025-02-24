@@ -1,5 +1,5 @@
 use alloc::vec::Vec;
-use core::cell::RefCell;
+use ethnum::u256;
 
 use crate::{
     storage::map::Map,
@@ -46,7 +46,7 @@ impl super::Context for TestContext {
         self.events.push(event);
     }
 
-    fn log(&self, text: &str) {}
+    fn log(&self, _text: &str) {}
 
     fn call(&self, buffer: crate::WaBuffer) -> WaBuffer {
         buffer
@@ -60,15 +60,15 @@ impl super::Context for TestContext {
         buffer
     }
 
-    fn encode_address(&self, address: &str) -> &'static [u8] {
+    fn encode_address(&self, _address: &str) -> &'static [u8] {
         b"abc"
     }
 
-    fn validate_bitcoin_address(&self, address: &str) -> bool {
+    fn validate_bitcoin_address(&self, _address: &str) -> bool {
         true
     }
 
-    fn verify_schnorr_signature(&self, data: &[u8]) -> bool {
+    fn verify_schnorr_signature(&self, _data: &[u8]) -> bool {
         true
     }
 
@@ -113,7 +113,7 @@ impl super::Context for TestContext {
         &self,
         pointer: crate::storage::StorageKey,
     ) -> crate::storage::StorageKey {
-        [0; 32]
+        (u256::from_be_bytes(pointer) + 1).to_le_bytes()
     }
 
     fn inputs(&self) -> Vec<crate::blockchain::transaction::Input> {

@@ -189,7 +189,7 @@ impl<'a> rust_runtime::contract::ContractTrait<'a> for Contract<'a> {
 // To run the tests, run `cargo test -p example` in the root of the workspace
 #[cfg(test)]
 mod tests {
-    use core::{cell::RefCell, task::Context};
+    use core::cell::RefCell;
 
     use crate::contract::SELECTOR_MINT;
     use alloc::{rc::Rc, vec::Vec};

@@ -3,7 +3,6 @@ use ethnum::u256;
 use crate::{
     blockchain::AddressHash,
     constant::ADDRESS_BYTE_LENGTH,
-    env::Context,
     math::abi::encode_selector_const,
     storage::{
         multi_address_map::MultiAddressMemoryMap,
@@ -187,7 +186,7 @@ pub trait OP20Trait<'a>: super::ContractTrait<'a> {
     }
 
     fn balance_of_base(&mut self, address: &AddressHash) -> u256 {
-        self.balance_of_map().get(address, u256::ZERO)
+        self.balance_of_map().get(address)
     }
 
     fn balance_of(
@@ -221,7 +220,7 @@ pub trait OP20Trait<'a>: super::ContractTrait<'a> {
             return Err(crate::error::Error::NoBalance);
         }
 
-        let balance: u256 = self.balance_of_map().get(&sender, u256::ZERO);
+        let balance: u256 = self.balance_of_map().get(&sender);
         if balance < value {
             return Err(crate::error::Error::InsufficientBalance);
         }
@@ -260,7 +259,7 @@ pub trait OP20Trait<'a>: super::ContractTrait<'a> {
         if !self.balance_of_map().contains_key(to) {
             self.balance_of_map().set(to, value);
         } else {
-            let to_balance = self.balance_of_map().get(to, u256::ZERO);
+            let to_balance = self.balance_of_map().get(to);
             self.balance_of_map().set(to, to_balance + value);
         }
 
@@ -291,7 +290,7 @@ pub trait OP20Trait<'a>: super::ContractTrait<'a> {
             return Err(crate::error::Error::CannotTransferZeroTokens);
         }
 
-        let balance = self.balance_of_map().get(&sender, u256::ZERO);
+        let balance = self.balance_of_map().get(&sender);
 
         if balance < value {
             return Err(crate::error::Error::InsufficientBalance);
@@ -299,7 +298,7 @@ pub trait OP20Trait<'a>: super::ContractTrait<'a> {
         let new_balance = balance - value;
         self.balance_of_map().set(&sender, new_balance);
 
-        let balance = self.balance_of_map().get(to, u256::ZERO);
+        let balance = self.balance_of_map().get(to);
         let new_balance = balance + value;
         self.balance_of_map().set(to, new_balance);
 
@@ -346,9 +345,7 @@ pub trait OP20Trait<'a>: super::ContractTrait<'a> {
         to: &AddressHash,
         value: u256,
     ) -> Result<bool, crate::error::Error> {
-        let context = self.context().clone();
-
-        let balance: u256 = self.balance_of_map().get(from, u256::ZERO);
+        let balance: u256 = self.balance_of_map().get(from);
         if balance < value {
             return Err(crate::error::Error::InsufficientBalance);
         }
@@ -359,7 +356,7 @@ pub trait OP20Trait<'a>: super::ContractTrait<'a> {
         if !self.balance_of_map().contains_key(to) {
             self.balance_of_map().set(to, value);
         } else {
-            let to_balance: u256 = self.balance_of_map().get(to, u256::ZERO);
+            let to_balance: u256 = self.balance_of_map().get(to);
             let new_to_balance = to_balance + value;
             self.balance_of_map().set(to, new_to_balance);
         }
