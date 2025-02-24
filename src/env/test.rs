@@ -99,10 +99,30 @@ impl super::Context for TestContext {
         }
     }
 
-    fn store(&self, pointer: crate::storage::StorageKey, value: crate::storage::StorageValue) {}
+    fn store(&self, pointer: crate::storage::StorageKey, value: crate::storage::StorageValue) {
+        if if let Some(old) = self.cache_store.borrow().get(&pointer) {
+            value.ne(old)
+        } else {
+            true
+        } {
+            self.cache_store
+                .borrow_mut()
+                .insert(pointer.clone(), value.clone());
+            self.global_store.borrow_mut().insert(pointer, value);
+        }
+    }
 
     fn exists(&self, pointer: &StorageKey) -> bool {
-        false
+        if self.cache_store.borrow().contains_key(pointer) {
+            true
+        } else {
+            if let Some(value) = self.global_store.borrow().get(pointer) {
+                self.cache_store.borrow_mut().insert(*pointer, *value);
+                true
+            } else {
+                false
+            }
+        }
     }
 
     fn next_pointer_greater_than(

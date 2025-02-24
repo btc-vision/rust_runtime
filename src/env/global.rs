@@ -41,19 +41,19 @@ extern "C" {
 }
 
 #[cfg(target_arch = "wasm32")]
-pub struct GlobalMethods {
+pub struct GlobalContext {
     store: Map<StorageKey, StorageValue>,
 }
 
 #[cfg(target_arch = "wasm32")]
-impl GlobalMethods {
+impl GlobalContext {
     pub const fn new() {
         Self { store: Map::new() }
     }
 }
 
 #[cfg(target_arch = "wasm32")]
-impl super::EnvMethods for GlobalMethods {
+impl super::Context for GlobalContext {
     fn log(&self, text: &str) {
         unsafe {
             if let Ok(string) = WaBuffer::from_str(text) {

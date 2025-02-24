@@ -12,9 +12,9 @@ use crate::{
 pub mod op_20;
 
 pub trait ContractTrait<'a> {
-    fn set_environment(&mut self, environment: &'static crate::blockchain::Environment);
+    fn set_environment(&mut self, environment: &'a crate::blockchain::Environment);
 
-    fn environment(&self) -> &'static crate::blockchain::Environment;
+    fn environment(&self) -> &'a crate::blockchain::Environment;
 
     fn context(&self) -> Rc<RefCell<dyn crate::env::Context>>;
 
