@@ -17,5 +17,6 @@ strip = true
 lol_alloc = { workspace = true }
 rust_runtime = { workspace = true }
 sha2-const = {workspace = true }
+spin = { version = "0.9.8", features=["mutex", "lazy"]}
 
 [features]

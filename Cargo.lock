@@ -62,6 +62,7 @@ dependencies = [
  "lol_alloc",
  "rust_runtime",
  "sha2-const",
+ "spin",
 ]
 
 [[package]]

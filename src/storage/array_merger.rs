@@ -34,7 +34,7 @@ impl ArrayMerger {
         self.context
             .borrow_mut()
             .load(&pointer)
-            .unwrap_or(self.default_value.clone())
+            .unwrap_or(self.default_value)
     }
 
     pub fn set<'a>(&mut self, key: &[u8], value: StorageValue) {

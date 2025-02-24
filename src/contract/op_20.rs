@@ -74,14 +74,14 @@ pub trait OP20Trait<'a>: super::ContractTrait<'a> {
                 let name = self.name();
                 let mut buffer = WaBuffer::new(name.len() + 2, 1)?;
                 let mut cursor = buffer.cursor();
-                cursor.write_string_with_len(&name)?;
+                cursor.write_string_with_len(name)?;
                 Ok(buffer)
             }
             SELECTOR_SYMBOL => {
                 let symbol = self.symbol();
                 let mut buffer = WaBuffer::new(symbol.len() + 2, 1)?;
                 let mut cursor = buffer.cursor();
-                cursor.write_string_with_len(&symbol)?;
+                cursor.write_string_with_len(symbol)?;
                 Ok(buffer)
             }
             SELECTOR_TOTAL_SUPPLY => {
@@ -187,7 +187,7 @@ pub trait OP20Trait<'a>: super::ContractTrait<'a> {
     }
 
     fn balance_of_base(&mut self, address: &AddressHash) -> u256 {
-        self.balance_of_map().get(address, u256::ZERO).into()
+        self.balance_of_map().get(address, u256::ZERO)
     }
 
     fn balance_of(
@@ -402,7 +402,8 @@ pub trait OP20Trait<'a>: super::ContractTrait<'a> {
     fn create_burn_event(&mut self, value: u256) -> Result<(), crate::error::Error> {
         let burn_event = crate::event::Event::burn(value)?;
 
-        Ok(self.context().borrow_mut().emit(&burn_event))
+        self.context().borrow_mut().emit(&burn_event);
+        Ok(())
     }
 
     fn create_approve_event(
@@ -412,7 +413,8 @@ pub trait OP20Trait<'a>: super::ContractTrait<'a> {
         value: u256,
     ) -> Result<(), crate::error::Error> {
         let approve_event = crate::event::Event::approve(deployer, spender, value)?;
-        Ok(self.context().borrow_mut().emit(&approve_event))
+        self.context().borrow_mut().emit(&approve_event);
+        Ok(())
     }
 
     fn create_mint_event(
@@ -421,7 +423,8 @@ pub trait OP20Trait<'a>: super::ContractTrait<'a> {
         amount: u256,
     ) -> Result<(), crate::error::Error> {
         let mint_event = crate::event::Event::mint(deployer, amount)?;
-        Ok(self.context().borrow_mut().emit(&mint_event))
+        self.context().borrow_mut().emit(&mint_event);
+        Ok(())
     }
 
     fn create_transfer_event(
@@ -431,6 +434,7 @@ pub trait OP20Trait<'a>: super::ContractTrait<'a> {
         amount: u256,
     ) -> Result<(), crate::error::Error> {
         let transfer_event = crate::event::Event::transfer(from, to, amount)?;
-        Ok(self.context().borrow_mut().emit(&transfer_event))
+        self.context().borrow_mut().emit(&transfer_event);
+        Ok(())
     }
 }

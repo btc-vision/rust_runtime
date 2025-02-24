@@ -1,26 +1,21 @@
 use crate::{
-    event,
     mem::WaBuffer,
     storage::{StorageKey, StorageValue},
 };
 use alloc::vec::Vec;
 #[allow(unused_imports)]
 use core::str::FromStr;
-mod global;
+pub mod global;
+
+#[cfg(not(target_arch = "wasm32"))]
 mod test;
+
+#[cfg(not(target_arch = "wasm32"))]
 pub use test::{Network, TestContext};
 
 #[cfg(target_arch = "wasm32")]
-pub use global::GLOBAL_METHODS;
-
-#[cfg(target_arch = "wasm32")]
 pub fn sha256(bytes: &[u8]) -> &'static [u8] {
-    unsafe {
-        WaBuffer::from_raw(super::global::sha256(
-            WaBuffer::from_bytes(bytes).unwrap().ptr(),
-        ))
-        .data()
-    }
+    unsafe { WaBuffer::from_raw(global::sha256(WaBuffer::from_bytes(bytes).unwrap().ptr())).data() }
 }
 
 #[cfg(not(target_arch = "wasm32"))]
@@ -30,9 +25,9 @@ pub fn sha256(bytes: &[u8]) -> &'static [u8] {
 }
 
 #[cfg(target_arch = "wasm32")]
-pub fn rimemd160(bytes: &[u8]) -> &'static [u8] {
+pub fn ripemd160(bytes: &[u8]) -> &'static [u8] {
     unsafe {
-        WaBuffer::from_raw(super::global::rimemd160(
+        WaBuffer::from_raw(global::ripemd160(
             WaBuffer::from_bytes(bytes).unwrap().ptr(),
         ))
         .data()
@@ -40,8 +35,8 @@ pub fn rimemd160(bytes: &[u8]) -> &'static [u8] {
 }
 
 #[cfg(not(target_arch = "wasm32"))]
-pub fn rimemd160(data: &[u8]) -> &'static [u8] {
-    use ripemd::{Digest, Ripemd160};
+pub fn ripemd160(data: &[u8]) -> &'static [u8] {
+    use ripemd::Digest;
 
     let mut hasher = ripemd::Ripemd160::new();
     hasher.update(data);
@@ -66,7 +61,7 @@ impl<T> WrappedMut<T> {
     pub fn as_mut(&self) -> &mut T {
         unsafe {
             if let Some(val) = ((&self.inner) as *const T as *mut T).as_mut() {
-                return val;
+                val
             } else {
                 panic!("Unexpected null");
             }
@@ -76,15 +71,15 @@ impl<T> WrappedMut<T> {
 
 pub trait Context {
     fn log(&self, text: &str);
-    fn emit(&self, event: &dyn crate::event::EventTrait);
+    fn emit(&mut self, event: &dyn crate::event::EventTrait);
     fn call(&self, buffer: WaBuffer) -> WaBuffer;
 
     fn deploy(&self, buffer: WaBuffer) -> WaBuffer;
     fn deploy_from_address(&self, buffer: WaBuffer) -> WaBuffer;
 
-    fn load(&self, pointer: &StorageKey) -> Option<StorageValue>;
-    fn store(&self, pointer: StorageKey, value: StorageValue);
-    fn exists(&self, pointer: &StorageKey) -> bool;
+    fn load(&mut self, pointer: &StorageKey) -> Option<StorageValue>;
+    fn store(&mut self, pointer: StorageKey, value: StorageValue);
+    fn exists(&mut self, pointer: &StorageKey) -> bool;
     fn next_pointer_greater_than(&self, pointer: StorageKey) -> StorageKey;
 
     fn encode_address(&self, address: &str) -> &'static [u8];
@@ -93,9 +88,11 @@ pub trait Context {
     fn sha256(&self, data: &[u8]) -> &'static [u8] {
         sha256(data)
     }
-    fn sha256_double(&self, data: &[u8]) -> &'static [u8];
-    fn rimemd160(&self, data: &[u8]) -> &'static [u8] {
-        rimemd160(data)
+    fn sha256_double(&self, data: &[u8]) -> &'static [u8] {
+        self.sha256(self.sha256(data))
+    }
+    fn ripemd160(&self, data: &[u8]) -> &'static [u8] {
+        ripemd160(data)
     }
 
     fn inputs(&self) -> Vec<crate::blockchain::transaction::Input>;
@@ -119,7 +116,7 @@ mod tests {
     fn test_ripemd160() {
         let text = "Hello world";
         assert_eq!(
-            crate::utils::to_hex(super::rimemd160(text.as_bytes())),
+            crate::utils::to_hex(super::ripemd160(text.as_bytes())),
             alloc::string::String::from("0xdbea7bd24eef40a2e79387542e36dd408b77b21a")
         );
     }

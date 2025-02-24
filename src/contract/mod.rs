@@ -80,8 +80,8 @@ pub trait ContractTrait<'a> {
     fn sha256_double(&self, data: &[u8]) -> &'static [u8] {
         self.context().borrow().sha256_double(data)
     }
-    fn rimemd160(&self, data: &[u8]) -> &'static [u8] {
-        self.context().borrow().rimemd160(data)
+    fn ripemd160(&self, data: &[u8]) -> &'static [u8] {
+        self.context().borrow().ripemd160(data)
     }
 
     fn inputs(&self) -> Vec<crate::blockchain::transaction::Input> {

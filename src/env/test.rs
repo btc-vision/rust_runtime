@@ -1,9 +1,7 @@
 use alloc::vec::Vec;
 use core::cell::RefCell;
-use libc_print::libc_println;
 
 use crate::{
-    env::WrappedMut,
     storage::map::Map,
     storage::{StorageKey, StorageValue},
     WaBuffer,
@@ -17,9 +15,9 @@ pub enum Network {
 
 pub struct TestContext {
     pub network: Network,
-    pub events: RefCell<alloc::vec::Vec<crate::event::Event>>,
-    pub global_store: RefCell<Map<StorageKey, StorageValue>>,
-    pub cache_store: RefCell<Map<StorageKey, StorageValue>>,
+    pub events: alloc::vec::Vec<crate::event::Event>,
+    pub global_store: Map<StorageKey, StorageValue>,
+    pub cache_store: Map<StorageKey, StorageValue>,
     pub inputs: alloc::vec::Vec<crate::blockchain::transaction::Input>,
     pub outputs: alloc::vec::Vec<crate::blockchain::transaction::Output>,
 }
@@ -33,9 +31,9 @@ impl TestContext {
     ) -> Self {
         Self {
             network,
-            events: RefCell::new(alloc::vec::Vec::new()),
-            global_store: RefCell::new(global_store),
-            cache_store: RefCell::new(Map::new()),
+            events: alloc::vec::Vec::new(),
+            global_store: global_store,
+            cache_store: Map::new(),
             inputs,
             outputs,
         }
@@ -43,16 +41,12 @@ impl TestContext {
 }
 
 impl super::Context for TestContext {
-    fn emit(&self, event: &dyn crate::event::EventTrait) {
+    fn emit(&mut self, event: &dyn crate::event::EventTrait) {
         let event = crate::event::Event::new(event.buffer());
-        unsafe {
-            self.events.borrow_mut().push(event);
-        }
+        self.events.push(event);
     }
 
-    fn log(&self, text: &str) {
-        libc_println!("{}", text);
-    }
+    fn log(&self, text: &str) {}
 
     fn call(&self, buffer: crate::WaBuffer) -> WaBuffer {
         buffer
@@ -78,50 +72,40 @@ impl super::Context for TestContext {
         true
     }
 
-    fn load(&self, pointer: &crate::storage::StorageKey) -> Option<crate::storage::StorageValue> {
-        if let Some(value) = if let Some(value) = self.cache_store.borrow().get(&pointer) {
+    fn load(
+        &mut self,
+        pointer: &crate::storage::StorageKey,
+    ) -> Option<crate::storage::StorageValue> {
+        if let Some(value) = self.cache_store.get(pointer) {
             Some(*value)
-        } else {
-            if let Some(value) = self.global_store.borrow().get(&pointer) {
-                self.cache_store.borrow_mut().insert(*pointer, *value);
-                Some(*value)
-            } else {
-                None
-            }
-        } {
-            if StorageValue::ZERO.eq(&value) {
-                None
-            } else {
-                Some(value)
-            }
+        } else if let Some(value) = self.global_store.get(pointer) {
+            self.cache_store.insert(*pointer, *value);
+            Some(*value)
         } else {
             None
         }
+        .filter(|&value| !StorageValue::ZERO.eq(&value))
     }
 
-    fn store(&self, pointer: crate::storage::StorageKey, value: crate::storage::StorageValue) {
-        if if let Some(old) = self.cache_store.borrow().get(&pointer) {
+    fn store(&mut self, pointer: crate::storage::StorageKey, value: crate::storage::StorageValue) {
+        if if let Some(old) = self.cache_store.get(&pointer) {
             value.ne(old)
         } else {
             true
         } {
-            self.cache_store
-                .borrow_mut()
-                .insert(pointer.clone(), value.clone());
-            self.global_store.borrow_mut().insert(pointer, value);
+            self.cache_store.insert(pointer, value);
+            self.global_store.insert(pointer, value);
         }
     }
 
-    fn exists(&self, pointer: &StorageKey) -> bool {
-        if self.cache_store.borrow().contains_key(pointer) {
+    fn exists(&mut self, pointer: &StorageKey) -> bool {
+        if self.cache_store.contains_key(pointer) {
+            true
+        } else if let Some(value) = self.global_store.get(pointer) {
+            self.cache_store.insert(*pointer, *value);
             true
         } else {
-            if let Some(value) = self.global_store.borrow().get(pointer) {
-                self.cache_store.borrow_mut().insert(*pointer, *value);
-                true
-            } else {
-                false
-            }
+            false
         }
     }
 
@@ -129,19 +113,7 @@ impl super::Context for TestContext {
         &self,
         pointer: crate::storage::StorageKey,
     ) -> crate::storage::StorageKey {
-        [0; 32].into()
-    }
-
-    fn sha256(&self, data: &[u8]) -> &'static [u8] {
-        b"ab"
-    }
-
-    fn sha256_double(&self, data: &[u8]) -> &'static [u8] {
-        b"ab2"
-    }
-
-    fn rimemd160(&self, data: &[u8]) -> &'static [u8] {
-        b"ab3"
+        [0; 32]
     }
 
     fn inputs(&self) -> Vec<crate::blockchain::transaction::Input> {

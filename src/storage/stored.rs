@@ -1,6 +1,6 @@
 use ethnum::u256;
 
-use super::{Map, StorageKey, StorageValue};
+use super::{StorageKey, StorageValue};
 use crate::{blockchain::AddressHash, math::abi::encode_pointer, Context};
 use alloc::rc::Rc;
 use core::{cell::RefCell, convert::Into};
@@ -45,7 +45,7 @@ where
                 .map(|value| value.into())
                 .unwrap_or(self.default_value.clone().into());
 
-            self.value = Some(value.clone());
+            self.value = Some(value);
             value
         }
     }
@@ -67,7 +67,7 @@ where
             .load(&self.pointer)
             .map(|value| value.into())
             .unwrap_or(self.default_value.clone().into());
-        self.value = Some(value.clone());
+        self.value = Some(value);
         value
     }
 
@@ -135,7 +135,7 @@ mod tests {
     use alloc::vec::Vec;
     use ethnum::u256;
 
-    use crate::storage::Map;
+    use crate::storage::map::Map;
     use crate::Context;
     use crate::TestContext;
 
