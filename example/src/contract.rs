@@ -1,3 +1,5 @@
+use core::cell::RefCell;
+
 use rust_runtime::{
     blockchain::AddressHash,
     contract::op_20::Pointer,
@@ -10,7 +12,7 @@ use rust_runtime::{
         StorageValue,
     },
     types::{CallData, Selector},
-    ContractTrait, EnvMethods, OP20Trait,
+    Context, ContractTrait, EnvMethods, OP20Trait,
 };
 
 const SELECTOR_AIRDROP: Selector = encode_selector_const("airdrop");
@@ -23,28 +25,30 @@ pub struct Contract<'a> {
     balance_of_map: StoredMap<AddressHash, u256>,
     allowance_map: MultiAddressMemoryMap,
     total_supply: StoredU256,
-    methods: &'a impl EnvMethods,
+    context: Rc<RefCell<dyn Context>>,
 }
 impl<'a> Contract<'a> {
-    pub const fn new(methods: &'a impl EnvMethods) -> Self {
+    pub const fn new(context: Rc<RefCell<Context>>) -> Self {
         Self {
             environment: None,
             params: rust_runtime::contract::op_20::OP20Params {
                 max_supply: StoredU256::new_const(
+                    context,
                     Pointer::MaxSupply.u16(),
                     u256::new(100000000000000000000000000),
                 ),
-                decimals: StoredU8::new_const(Pointer::Decimals.u16(), 18),
+                decimals: StoredU8::new_const(context, Pointer::Decimals.u16(), 18),
                 name: "MyToken",
                 symbol: "TOKEN",
             },
-            balance_of_map: StoredMap::new(Pointer::BalanceOfMap.u16()),
+            balance_of_map: StoredMap::new(context, Pointer::BalanceOfMap.u16()),
             allowance_map: MultiAddressMemoryMap::new(
+                context,
                 Pointer::AllowanceMap.u16(),
                 StorageValue::ZERO,
             ),
-            total_supply: StoredU256::new_const(Pointer::TotalSupply.u16(), u256::ZERO),
-            methods,
+            total_supply: StoredU256::new_const(context, Pointer::TotalSupply.u16(), u256::ZERO),
+            context,
         }
     }
 }
@@ -104,7 +108,7 @@ impl Contract {
         let value = self.total_supply.value() + amount;
         self.total_supply.set_no_commit(value);
 
-        Self::create_mint_event(address, amount)?;
+        self.create_mint_event(address, amount)?;
 
         Ok(())
     }
@@ -156,6 +160,10 @@ impl rust_runtime::contract::ContractTrait for Contract {
 
     fn environment(&self) -> &'static rust_runtime::blockchain::Environment {
         self.environment.unwrap()
+    }
+
+    fn context(&self) -> alloc::rc::Rc<RefCell<dyn rust_runtime::env::Context>> {
+        self.context
     }
 
     fn execute(

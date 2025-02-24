@@ -3,9 +3,9 @@ use crate::{
     mem::WaBuffer,
     storage::{StorageKey, StorageValue},
 };
+use alloc::vec::Vec;
 #[allow(unused_imports)]
 use core::str::FromStr;
-
 mod global;
 mod test;
 pub use test::{Network, TestContext};
@@ -50,32 +50,56 @@ pub fn rimemd160(data: &[u8]) -> &'static [u8] {
     alloc::boxed::Box::leak(alloc::boxed::Box::new(hash.to_vec()))
 }
 
-pub trait Context<'a> {
+pub struct WrappedMut<T> {
+    inner: T,
+}
+
+impl<T> WrappedMut<T> {
+    pub const fn new(t: T) -> WrappedMut<T> {
+        Self { inner: t }
+    }
+
+    pub fn as_ref(&self) -> &T {
+        &self.inner
+    }
+
+    pub fn as_mut(&self) -> &mut T {
+        unsafe {
+            if let Some(val) = ((&self.inner) as *const T as *mut T).as_mut() {
+                return val;
+            } else {
+                panic!("Unexpected null");
+            }
+        }
+    }
+}
+
+pub trait Context {
     fn log(&self, text: &str);
-    fn emit(&self, event: &impl crate::event::EventTrait);
+    fn emit(&self, event: &dyn crate::event::EventTrait);
     fn call(&self, buffer: WaBuffer) -> WaBuffer;
 
     fn deploy(&self, buffer: WaBuffer) -> WaBuffer;
     fn deploy_from_address(&self, buffer: WaBuffer) -> WaBuffer;
 
-    fn load(&self, pointer: &StorageKey, default: StorageValue) -> StorageValue;
+    fn load(&self, pointer: &StorageKey) -> Option<StorageValue>;
     fn store(&self, pointer: StorageKey, value: StorageValue);
     fn exists(&self, pointer: &StorageKey) -> bool;
     fn next_pointer_greater_than(&self, pointer: StorageKey) -> StorageKey;
 
-    fn encode_address(&self, address: &str) -> &'a [u8];
+    fn encode_address(&self, address: &str) -> &'static [u8];
     fn validate_bitcoin_address(&self, address: &str) -> bool;
     fn verify_schnorr_signature(&self, data: &[u8]) -> bool;
-    fn sha256(&self, data: &[u8]) -> &'a [u8] {
+    fn sha256(&self, data: &[u8]) -> &'static [u8] {
         sha256(data)
     }
-    fn sha256_double(&self, data: &[u8]) -> &'a [u8];
-    fn rimemd160(&self, data: &[u8]) -> &'a [u8] {
+    fn sha256_double(&self, data: &[u8]) -> &'static [u8];
+    fn rimemd160(&self, data: &[u8]) -> &'static [u8] {
         rimemd160(data)
     }
 
-    fn iter_inputs(&self) -> impl Iterator<Item = &crate::blockchain::transaction::Input>;
-    fn iter_outputs(&self) -> impl Iterator<Item = &crate::blockchain::transaction::Output>;
+    fn inputs(&self) -> Vec<crate::blockchain::transaction::Input>;
+    fn outputs(&self) -> Vec<crate::blockchain::transaction::Output>;
 }
 
 #[cfg(test)]

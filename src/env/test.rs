@@ -1,8 +1,9 @@
-use core::ptr::NonNull;
-
+use alloc::vec::Vec;
+use core::cell::RefCell;
 use libc_print::libc_println;
 
 use crate::{
+    env::WrappedMut,
     storage::map::Map,
     storage::{StorageKey, StorageValue},
     WaBuffer,
@@ -16,9 +17,9 @@ pub enum Network {
 
 pub struct TestContext {
     pub network: Network,
-    pub events: NonNull<alloc::vec::Vec<crate::event::Event>>,
-    pub global_store: NonNull<Map<StorageKey, StorageValue>>,
-    pub cache_store: NonNull<Map<StorageKey, StorageValue>>,
+    pub events: RefCell<alloc::vec::Vec<crate::event::Event>>,
+    pub global_store: RefCell<Map<StorageKey, StorageValue>>,
+    pub cache_store: RefCell<Map<StorageKey, StorageValue>>,
     pub inputs: alloc::vec::Vec<crate::blockchain::transaction::Input>,
     pub outputs: alloc::vec::Vec<crate::blockchain::transaction::Output>,
 }
@@ -32,19 +33,21 @@ impl TestContext {
     ) -> Self {
         Self {
             network,
-            events: NonNull::new(alloc::vec::Vec::new()).unwrap(),
-            global_store,
-            cache_store: Map::new(),
+            events: RefCell::new(alloc::vec::Vec::new()),
+            global_store: RefCell::new(global_store),
+            cache_store: RefCell::new(Map::new()),
             inputs,
             outputs,
         }
     }
 }
 
-impl<'a> super::Context<'a> for TestContext {
-    fn emit(&mut self, event: &impl crate::event::EventTrait) {
+impl super::Context for TestContext {
+    fn emit(&self, event: &dyn crate::event::EventTrait) {
         let event = crate::event::Event::new(event.buffer());
-        self.events.push(event);
+        unsafe {
+            self.events.borrow_mut().push(event);
+        }
     }
 
     fn log(&self, text: &str) {
@@ -75,32 +78,30 @@ impl<'a> super::Context<'a> for TestContext {
         true
     }
 
-    fn load(
-        &mut self,
-        pointer: &crate::storage::StorageKey,
-        default_value: crate::storage::StorageValue,
-    ) -> crate::storage::StorageValue {
-        if self.cache_store.contains_key(&pointer) {
-            *self.cache_store.get(&pointer).unwrap()
+    fn load(&self, pointer: &crate::storage::StorageKey) -> Option<crate::storage::StorageValue> {
+        if let Some(value) = if let Some(value) = self.cache_store.borrow().get(&pointer) {
+            Some(*value)
         } else {
-            match self.global_store.get(&pointer) {
-                Some(result) => {
-                    if StorageValue::ZERO.eq(result) && default_value != StorageValue::ZERO {
-                        self.cache_store.insert(*pointer, default_value);
-                        default_value
-                    } else {
-                        self.cache_store.insert(*pointer, *result);
-                        *result
-                    }
-                }
-                None => default_value,
+            if let Some(value) = self.global_store.borrow().get(&pointer) {
+                self.cache_store.borrow_mut().insert(*pointer, *value);
+                Some(*value)
+            } else {
+                None
             }
+        } {
+            if StorageValue::ZERO.eq(&value) {
+                None
+            } else {
+                Some(value)
+            }
+        } else {
+            None
         }
     }
 
-    fn store(&mut self, pointer: crate::storage::StorageKey, value: crate::storage::StorageValue) {}
+    fn store(&self, pointer: crate::storage::StorageKey, value: crate::storage::StorageValue) {}
 
-    fn exists(&mut self, pointer: &StorageKey) -> bool {
+    fn exists(&self, pointer: &StorageKey) -> bool {
         false
     }
 
@@ -123,11 +124,11 @@ impl<'a> super::Context<'a> for TestContext {
         b"ab3"
     }
 
-    fn iter_inputs(&self) -> impl Iterator<Item = &crate::blockchain::transaction::Input> {
-        self.inputs.iter()
+    fn inputs(&self) -> Vec<crate::blockchain::transaction::Input> {
+        self.inputs.clone()
     }
 
-    fn iter_outputs(&self) -> impl Iterator<Item = &crate::blockchain::transaction::Output> {
-        self.outputs.iter()
+    fn outputs(&self) -> Vec<crate::blockchain::transaction::Output> {
+        self.outputs.clone()
     }
 }

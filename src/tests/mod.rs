@@ -49,7 +49,7 @@ pub fn random_environment() -> Environment {
 }
 
 pub fn execute(
-    contract: &mut impl crate::ContractTrait,
+    contract: &mut dyn crate::ContractTrait,
     selector: crate::types::Selector,
 ) -> Cursor {
     let mut buffer = crate::WaBuffer::new(32, 1).unwrap();
@@ -59,7 +59,7 @@ pub fn execute(
 }
 
 pub fn execute_address(
-    contract: &mut impl crate::ContractTrait,
+    contract: &mut dyn crate::ContractTrait,
     selector: crate::types::Selector,
     address: &AddressHash,
 ) -> Cursor {
@@ -71,7 +71,7 @@ pub fn execute_address(
 }
 
 pub fn execute_address_amount(
-    contract: &mut impl crate::ContractTrait,
+    contract: &mut dyn crate::ContractTrait,
     selector: crate::types::Selector,
     address: &AddressHash,
     amount: u256,
