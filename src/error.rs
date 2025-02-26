@@ -46,6 +46,6 @@ impl Error {
 
 impl Debug for Error {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        f.debug_struct(&self.as_str()).finish()
+        f.debug_struct(self.as_str()).finish()
     }
 }

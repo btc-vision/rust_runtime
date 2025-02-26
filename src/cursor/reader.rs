@@ -137,7 +137,7 @@ impl super::Cursor {
         self.reader += len as usize;
         unsafe {
             Ok(str::from_raw_parts(
-                self.inner.as_ptr().add(pos as usize),
+                self.inner.as_ptr().add(pos),
                 len as usize,
             ))
         }

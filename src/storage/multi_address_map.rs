@@ -1,16 +1,25 @@
-use crate::blockchain::AddressHash;
+use alloc::rc::Rc;
+use core::cell::RefCell;
+
+use crate::{blockchain::AddressHash, Context};
 
 use super::{array_merger::ArrayMerger, map::Map, StorageValue};
 
 pub struct MultiAddressMemoryMap {
+    context: Rc<RefCell<dyn Context>>,
     pointer: u16,
     default_value: StorageValue,
     pub map: Map<AddressHash, ArrayMerger>,
 }
 
 impl MultiAddressMemoryMap {
-    pub const fn new(pointer: u16, default_value: StorageValue) -> Self {
+    pub const fn new(
+        context: Rc<RefCell<dyn Context>>,
+        pointer: u16,
+        default_value: StorageValue,
+    ) -> Self {
         Self {
+            context,
             pointer,
             default_value,
             map: Map::new(),
@@ -39,7 +48,12 @@ impl MultiAddressMemoryMap {
         if !self.map.contains_key(key) {
             self.map.push(
                 *key,
-                ArrayMerger::new(key.bytes.to_vec(), self.pointer, self.default_value),
+                ArrayMerger::new(
+                    self.context.clone(),
+                    key.bytes.to_vec(),
+                    self.pointer,
+                    self.default_value,
+                ),
             );
         }
     }

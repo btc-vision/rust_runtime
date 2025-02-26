@@ -6,10 +6,13 @@ pub trait EventTrait {
 }
 
 pub struct Event {
-    buffer: WaBuffer,
+    pub buffer: WaBuffer,
 }
 
 impl Event {
+    pub fn new(buffer: WaBuffer) -> Event {
+        Self { buffer }
+    }
     pub fn approve(
         owner: AddressHash,
         spender: AddressHash,

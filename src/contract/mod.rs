@@ -1,11 +1,22 @@
-use crate::{blockchain::AddressHash, mem::WaBuffer, types::CallData};
+use alloc::rc::Rc;
+use alloc::vec::Vec;
+use core::cell::RefCell;
 
+use crate::{
+    blockchain::AddressHash,
+    mem::WaBuffer,
+    storage::{StorageKey, StorageValue},
+    types::CallData,
+    Context,
+};
 pub mod op_20;
 
-pub trait ContractTrait {
-    fn set_environment(&mut self, environment: &'static crate::blockchain::Environment);
+pub trait ContractTrait<'a> {
+    fn set_environment(&mut self, environment: &'a crate::blockchain::Environment);
 
-    fn environment(&self) -> &'static crate::blockchain::Environment;
+    fn environment(&self) -> &'a crate::blockchain::Environment;
+
+    fn context(&self) -> Rc<RefCell<dyn Context>>;
 
     fn is_self(&self, address: &AddressHash) -> bool {
         address.eq(&self.environment().address)
@@ -19,17 +30,64 @@ pub trait ContractTrait {
         }
     }
 
-    fn emit(event: &impl crate::event::EventTrait) -> Result<(), crate::error::Error> {
-        crate::env::emit(event.buffer());
-        Ok(())
-    }
-
     fn on_deploy(&mut self, _call_data: CallData) {
-        crate::log("On Deploy is not implemented");
+        self.context().borrow().log("On Deploy is not implemented");
     }
 
     fn execute(&mut self, _call_data: CallData) -> Result<WaBuffer, crate::error::Error> {
-        crate::log("Execute is not implemented");
+        self.context().borrow().log("Execute is not implemented");
         unimplemented!("Execute needs to be implemented");
+    }
+
+    fn log(&self, text: &str) {
+        self.context().borrow().log(text);
+    }
+    fn emit(&self, event: &dyn crate::event::EventTrait) {
+        self.context().borrow_mut().emit(event);
+    }
+    fn call(&self, buffer: WaBuffer) -> WaBuffer {
+        self.context().borrow().call(buffer)
+    }
+
+    fn load(&self, pointer: &StorageKey) -> Option<StorageValue> {
+        self.context().borrow_mut().load(pointer)
+    }
+    fn store(&self, pointer: StorageKey, value: StorageValue) {
+        self.context().borrow_mut().store(pointer, value)
+    }
+    fn exists(&self, pointer: &StorageKey) -> bool {
+        self.context().borrow_mut().exists(pointer)
+    }
+    fn next_pointer_greater_than(&self, pointer: StorageKey) -> StorageKey {
+        self.context()
+            .as_ref()
+            .borrow()
+            .next_pointer_greater_than(pointer)
+    }
+
+    fn encode_address(&self, address: &str) -> &'static [u8] {
+        self.context().borrow().encode_address(address)
+    }
+    fn validate_bitcoin_address(&self, address: &str) -> bool {
+        self.context().borrow().validate_bitcoin_address(address)
+    }
+    fn verify_schnorr_signature(&self, data: &[u8]) -> bool {
+        self.context().borrow().verify_schnorr_signature(data)
+    }
+    fn sha256(&self, data: &[u8]) -> &'static [u8] {
+        self.context().borrow().sha256(data)
+    }
+    fn sha256_double(&self, data: &[u8]) -> &'static [u8] {
+        self.context().borrow().sha256_double(data)
+    }
+    fn ripemd160(&self, data: &[u8]) -> &'static [u8] {
+        self.context().borrow().ripemd160(data)
+    }
+
+    fn inputs(&self) -> Vec<crate::blockchain::transaction::Input> {
+        self.context().borrow_mut().inputs()
+    }
+    fn outputs(&self) -> Vec<crate::blockchain::transaction::Output> {
+        self.context().borrow_mut().outputs()
     }
 }

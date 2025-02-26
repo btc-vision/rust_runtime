@@ -10,3 +10,6 @@ pub fn validate_bitcoin_address(address: &str) -> Result<bool, crate::error::Err
             .read_bool()
     }
 }
+
+#[cfg(not(target_arch = "wasm32"))]
+pub fn validate_bitcoin_address(address: &str) -> Result<bool, crate::error::Error> {}

@@ -1,37 +1,51 @@
+use core::cell::RefCell;
+
+use crate::{constant::STORE_VALUE_SIZE, storage::StorageValue, Context};
+use alloc::rc::Rc;
 use alloc::string::String;
 
-use crate::{constant::STORE_VALUE_SIZE, storage::StorageValue};
-
-use super::{stored::StoredTrait, GlobalStore};
+use super::stored::StoredTrait;
 
 pub struct StoredString {
+    context: Rc<RefCell<dyn Context>>,
     pointer: u16,
     default_value: &'static str,
     value: Option<alloc::string::String>,
 }
 
 impl StoredString {
-    pub const fn new_const(pointer: u16, default_value: &'static str) -> Self {
+    pub const fn new_const(
+        context: Rc<RefCell<dyn Context>>,
+        pointer: u16,
+        default_value: &'static str,
+    ) -> Self {
         Self {
+            context,
             pointer,
             default_value,
             value: None,
         }
     }
 
-    pub fn new(pointer: u16, default_value: &'static str) -> Self {
+    pub fn new(
+        context: Rc<RefCell<dyn Context>>,
+        pointer: u16,
+        default_value: &'static str,
+    ) -> Self {
         Self {
+            context,
             pointer,
             default_value,
             value: None,
         }
     }
 
-    fn save(&mut self, value: String) -> String {
+    fn save<'a>(&mut self, value: String) -> String {
         let bytes = value.as_bytes();
         let mut remaining = bytes.len();
         let mut offset = [0u8; crate::constant::STORE_VALUE_SIZE];
         assert!(remaining < 2048);
+        let mut context = self.context.borrow_mut();
 
         let mut data = [0u8; crate::constant::STORE_VALUE_SIZE];
         let mut length = remaining.min(STORE_VALUE_SIZE - 4);
@@ -39,7 +53,7 @@ impl StoredString {
         data[4..4 + remaining.min(28)].copy_from_slice(&bytes[0..length]);
         let key = crate::math::abi::encode_pointer(self.pointer, &offset);
         remaining -= length;
-        GlobalStore::set(key, data.into());
+        context.store(key, data.into());
 
         while remaining > 0 {
             length = remaining.min(crate::constant::STORE_VALUE_SIZE);
@@ -55,18 +69,19 @@ impl StoredString {
             remaining -= length;
 
             let key = crate::math::abi::encode_pointer(self.pointer, &offset);
-            GlobalStore::set(key, data.into());
+            context.store(key, data.into());
         }
         self.value = Some(value.clone());
         value
     }
 
-    fn load(&mut self) -> String {
+    fn load<'a>(&mut self) -> String {
         let mut offset = [0u8; crate::constant::STORE_VALUE_SIZE];
-        let header = GlobalStore::get(
-            &crate::math::abi::encode_pointer(self.pointer, &offset),
-            StorageValue::ZERO,
-        );
+        let mut context = self.context.borrow_mut();
+
+        let header = context
+            .load(&crate::math::abi::encode_pointer(self.pointer, &offset))
+            .unwrap_or(StorageValue::ZERO);
         let bytes = header.bytes();
         let len = u32::from_le_bytes(bytes[0..4].try_into().unwrap()) as usize;
         let mut length = len.min(crate::constant::STORE_VALUE_SIZE);
@@ -79,7 +94,7 @@ impl StoredString {
         while remaining > 0 {
             offset[crate::constant::STORE_KEY_SIZE - 1] += 1;
             let key = crate::math::abi::encode_pointer(self.pointer, &offset);
-            let tmp = GlobalStore::get(&key, StorageValue::ZERO);
+            let tmp = context.load(&key).unwrap_or(StorageValue::ZERO);
             let bytes = tmp.bytes();
             length = remaining.min(crate::constant::STORE_VALUE_SIZE);
             for &byte in bytes.iter().take(length) {
