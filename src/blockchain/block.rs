@@ -1,3 +1,4 @@
+#[derive(Clone)]
 pub struct BlockHash {
     pub bytes: [u8; crate::constant::BLOCK_HASH_LENGTH],
 }

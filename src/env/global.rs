@@ -1,91 +1,126 @@
-use crate::mem::WaPtr;
+use alloc::vec::Vec;
+
 use crate::{
-    storage::{key::StorageKey, map::Map, value::StorageValue},
-    WaBuffer,
+    blockchain::{transaction::Input, AddressHash},
+    cursor::Cursor,
+    storage::{
+        key::{self, StorageKey},
+        map::Map,
+        value::{self, StorageValue},
+    },
+    WaPtr,
 };
-use core::str::FromStr;
 use ethnum::u256;
 
-//#[cfg(target_arch = "wasm32")]
 #[link(wasm_import_module = "env")]
 extern "C" {
-    #[allow(dead_code)]
-    pub fn load(ptr: WaPtr) -> WaPtr;
-    #[allow(dead_code)]
-    pub fn store(ptr: WaPtr) -> WaPtr;
+    pub fn revert(data: u32, length: u32);
 
-    #[allow(dead_code)]
-    pub fn nextPointerGreaterThan(ptr: WaPtr) -> WaPtr;
+    #[link_name = "getCalldata"]
+    pub fn get_call_data(offset: u32, length: u32, result: WaPtr);
 
-    #[allow(dead_code)]
-    pub fn deploy(ptr: WaPtr) -> WaPtr;
-    #[allow(dead_code)]
-    pub fn deployFromAddress(ptr: WaPtr) -> WaPtr;
+    pub fn load(key: u32, result: u32);
 
-    #[allow(dead_code)]
-    pub fn call(ptr: WaPtr) -> WaPtr;
-    #[allow(dead_code)]
-    pub fn log(ptr: WaPtr);
-    #[allow(dead_code)]
-    pub fn emit(ptr: WaPtr);
-    #[allow(dead_code)]
-    pub fn encodeAddress(ptr: WaPtr) -> WaPtr;
-    #[allow(dead_code)]
-    pub fn validateBitcoinAddress(ptr: WaPtr) -> WaPtr;
-    #[allow(dead_code)]
-    pub fn verifySchnorrSignature(ptr: WaPtr) -> WaPtr;
-    #[allow(dead_code)]
-    pub fn sha256(ptr: WaPtr) -> WaPtr;
-    #[allow(dead_code)]
-    pub fn ripemd160(ptr: WaPtr) -> WaPtr;
-    #[allow(dead_code)]
-    pub fn inputs() -> WaPtr;
-    #[allow(dead_code)]
-    pub fn outputs() -> WaPtr;
+    pub fn store(key: u32, value: u32);
+
+    #[link_name = "deployFromAddress"]
+    pub fn deploy_from_address(origin_address: u32, salt: u32, result_address: u32) -> u32;
+
+    pub fn call(address: u32, call_data: u32, call_data_length: u32, resultLength: u32);
+
+    #[link_name = "callResult"]
+    pub fn call_result(offset: u32, length: u32, result: u32);
+
+    pub fn emit(data: u32, data_length: u32);
+    #[link_name = "encodeAddress"]
+    pub fn encode_address(data: u32) -> u32;
+
+    #[link_name = "validateBitcoinAddress"]
+    pub fn validate_bitcoin_address(addres: u32, address_length: u32) -> u32;
+
+    #[link_name = "verifySchnorrSignature"]
+    pub fn verify_schnorr_signature(public_key: u32, signature: u32, message: u32) -> u32;
+
+    pub fn sha256(data: u32, data_legth: u32, result: u32);
+
+    pub fn ripemd160(data: u32, data_length: u32, result: u32);
+
+    #[link_name = "inputsSize"]
+    pub fn inputs_size() -> u32;
+
+    pub fn inputs(buffer: u32);
+
+    #[link_name = "outputsSize"]
+    pub fn outputs_size() -> u32;
+
+    pub fn outputs(buffer: u32);
+}
+
+#[link(wasm_import_module = "debug")]
+extern "C" {
+    pub fn log(ptr: u32);
 }
 
 //#[cfg(target_arch = "wasm32")]
 pub struct GlobalContext {
     store: Map<StorageKey, StorageValue>,
+    inputs: Option<Vec<crate::blockchain::transaction::Input>>,
+    outputs: Option<Vec<crate::blockchain::transaction::Output>>,
 }
 
 //#[cfg(target_arch = "wasm32")]
 impl GlobalContext {
     pub const fn new() -> Self {
-        Self { store: Map::new() }
+        Self {
+            store: Map::new(),
+            inputs: None,
+            outputs: None,
+        }
     }
 }
 
 //#[cfg(target_arch = "wasm32")]
 impl super::Context for GlobalContext {
+    fn get_call_data(&self, size: usize) -> Cursor {
+        let cursor = crate::cursor::Cursor::new(size);
+        unsafe {
+            get_call_data(0, size as u32, cursor.ptr());
+        }
+        cursor
+    }
+
     fn log(&self, text: &str) {
         unsafe {
-            if let Ok(string) = WaBuffer::from_str(text) {
-                log(string.ptr());
-            }
+            let bytes = text
+                .as_bytes()
+                .iter()
+                .chain(b"\0".iter())
+                .cloned()
+                .collect::<alloc::vec::Vec<u8>>();
+            log(bytes.as_ptr() as u32);
         }
     }
 
     fn emit(&mut self, event: &dyn crate::event::EventTrait) {
         unsafe {
-            emit(event.buffer().ptr());
+            emit(event.ptr(), event.buffer().len() as u32);
         }
     }
 
-    fn call(&self, buffer: WaBuffer) -> WaBuffer {
-        unsafe { WaBuffer::from_raw(call(buffer.ptr())) }
+    fn call(&self, address: &crate::blockchain::AddressHash, data: Cursor) -> Cursor {
+        data
     }
 
     fn encode_address(&self, _address: &str) -> &'static [u8] {
         b"abcd"
     }
 
-    fn deploy(&self, buffer: WaBuffer) -> WaBuffer {
-        unsafe { WaBuffer::from_raw(deploy(buffer.ptr())) }
-    }
-
-    fn deploy_from_address(&self, buffer: WaBuffer) -> WaBuffer {
-        unsafe { WaBuffer::from_raw(deployFromAddress(buffer.ptr())) }
+    fn deploy_from_address(
+        &self,
+        from_address: &AddressHash,
+        salt: [u8; 32],
+    ) -> Result<AddressHash, crate::error::Error> {
+        Ok(*from_address)
     }
 
     fn validate_bitcoin_address(&self, _address: &str) -> bool {
@@ -98,8 +133,9 @@ impl super::Context for GlobalContext {
 
     fn load(&mut self, pointer: &StorageKey) -> Option<StorageValue> {
         unsafe {
-            let mut buffer = WaBuffer::from_raw(load(WaBuffer::from_bytes(pointer).unwrap().ptr()));
-            let value: StorageValue = buffer.cursor().read_u256_be().unwrap().into();
+            let mut value = StorageValue::from_bytes([0; 32]);
+            load(pointer.ptr().0, value.ptr().0);
+
             if value.eq(&StorageValue::ZERO) {
                 None
             } else {
@@ -125,20 +161,44 @@ impl super::Context for GlobalContext {
                 false
             } {
                 self.store.insert(pointer, value);
-                store(WaBuffer::from_bytes(value.bytes()).unwrap().ptr());
+                store(pointer.ptr().0, value.ptr().0)
             }
         }
     }
 
-    fn next_pointer_greater_than(&self, pointer: StorageKey) -> StorageKey {
-        (u256::from_le_bytes(pointer) + 1).to_le_bytes()
+    fn inputs(&mut self) -> alloc::vec::Vec<crate::blockchain::transaction::Input> {
+        if let Some(inputs) = &self.inputs {
+            inputs.clone()
+        } else {
+            Vec::new()
+        }
     }
 
-    fn inputs(&self) -> alloc::vec::Vec<crate::blockchain::transaction::Input> {
-        alloc::vec::Vec::new()
+    /*
+    fn iter_inputs(&mut self) -> impl Iterator<Item = &crate::blockchain::transaction::Input> {
+        if self.inputs.is_none() {
+            self.inputs = Some(Vec::new());
+        }
+
+        self.inputs.as_ref().unwrap().iter()
+    }
+     */
+
+    fn outputs(&mut self) -> alloc::vec::Vec<crate::blockchain::transaction::Output> {
+        if let Some(outputs) = &self.outputs {
+            outputs.clone()
+        } else {
+            Vec::new()
+        }
     }
 
-    fn outputs(&self) -> alloc::vec::Vec<crate::blockchain::transaction::Output> {
-        alloc::vec::Vec::new()
+    /*
+    fn iter_outputs(&mut self) -> impl Iterator<Item = &crate::blockchain::transaction::Output> {
+        if self.outputs.is_none() {
+            self.outputs = Some(Vec::new());
+        }
+
+        self.outputs.as_ref().unwrap().iter()
     }
+     */
 }

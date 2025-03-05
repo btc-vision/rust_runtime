@@ -1,4 +1,4 @@
-use crate::storage::StorageKey;
+use crate::{storage::StorageKey, WaPtr};
 
 #[derive(Clone, Copy, Eq, PartialEq, Debug)]
 pub struct AddressHash {
@@ -7,7 +7,7 @@ pub struct AddressHash {
 
 impl From<AddressHash> for StorageKey {
     fn from(val: AddressHash) -> Self {
-        val.bytes
+        StorageKey::new(val.bytes)
     }
 }
 
@@ -24,9 +24,17 @@ impl AddressHash {
             161, 210, 254, 244, 21, 57, 153, 34, 205, 138, 4, 72, 92, 2,
         ],
     };
+    pub const fn new_from_bytes(bytes: [u8; crate::constant::ADDRESS_BYTE_LENGTH]) -> Self {
+        Self { bytes }
+    }
+
     pub fn new(bytes: &[u8]) -> Self {
         Self {
             bytes: bytes.try_into().unwrap(),
         }
+    }
+
+    pub fn ptr(&self) -> WaPtr {
+        WaPtr::from(&self.bytes)
     }
 }

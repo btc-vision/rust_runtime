@@ -35,14 +35,14 @@ where
 
     pub fn set(&self, key: &K, value: V) {
         let key: StorageKey = (*key).into();
-        let key_hash = encode_pointer(self.pointer, &key);
+        let key_hash = encode_pointer(self.pointer, &key.bytes);
         let value = Into::<StorageValue>::into(value);
         self.context.borrow_mut().store(key_hash, value);
     }
 
     pub fn get(&self, key: &K) -> V {
         let key: StorageKey = (*key).into();
-        let key_hash = encode_pointer(self.pointer, &key);
+        let key_hash = encode_pointer(self.pointer, &key.bytes);
         self.context
             .borrow_mut()
             .load(&key_hash)
@@ -52,7 +52,7 @@ where
 
     pub fn contains_key(&self, key: &K) -> bool {
         let key: StorageKey = (*key).into();
-        let key_hash = encode_pointer(self.pointer, &key);
+        let key_hash = encode_pointer(self.pointer, &key.bytes);
         let has = self.context.borrow_mut().exists(&key_hash);
         has
     }

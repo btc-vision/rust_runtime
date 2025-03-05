@@ -1,4 +1,8 @@
-use crate::WaBuffer;
+use core::alloc::Layout;
+
+use ::alloc::alloc::alloc;
+
+use crate::WaPtr;
 
 pub mod reader;
 pub mod writer;
@@ -9,7 +13,33 @@ pub struct Cursor {
     writer: usize,
 }
 
+impl Clone for Cursor {
+    fn clone(&self) -> Self {
+        Cursor::from_ptr(self.ptr(), self.inner.len())
+    }
+}
+
 impl Cursor {
+    pub fn new(size: usize) -> Cursor {
+        unsafe {
+            let layout = Layout::from_size_align_unchecked(size, 1);
+            Cursor {
+                inner: core::slice::from_raw_parts_mut(alloc(layout), size),
+                reader: 0,
+                writer: 0,
+            }
+        }
+    }
+
+    pub fn from_ptr(ptr: WaPtr, size: usize) -> Cursor {
+        unsafe {
+            Cursor {
+                inner: core::slice::from_raw_parts_mut(ptr.0 as *mut u8, size),
+                reader: 0,
+                writer: 0,
+            }
+        }
+    }
     pub fn from_slice(inner: &'static mut [u8]) -> Cursor {
         Cursor {
             reader: 0,
@@ -35,8 +65,8 @@ impl Cursor {
         self.writer = 0;
     }
 
-    pub fn get_buffer(&self) -> Result<WaBuffer, crate::error::Error> {
-        WaBuffer::from_bytes(self.inner)
+    pub fn ptr(&self) -> WaPtr {
+        WaPtr((self.inner.as_ptr()) as u32)
     }
 }
 

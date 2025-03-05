@@ -1,5 +1,6 @@
 use super::AddressHash;
 
+#[derive(Clone)]
 pub struct Environment {
     pub sender: super::AddressHash,
     pub origin: super::AddressHash,

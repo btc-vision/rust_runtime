@@ -1,25 +1,60 @@
+use core::cell::RefCell;
+extern crate std;
 use alloc::vec::Vec;
-use ethnum::u256;
+use alloc::{boxed::Box, rc::Rc};
 
+use crate::contract;
 use crate::{
-    storage::map::Map,
-    storage::{StorageKey, StorageValue},
-    WaBuffer,
+    blockchain::{address, AddressHash},
+    cursor::Cursor,
+    storage::{map::Map, StorageKey, StorageValue},
+    ContractTrait,
 };
 
+#[derive(Clone)]
 pub enum Network {
     Mainnet,
     Testnet,
     Preview,
 }
+pub struct TestRouter {
+    contracts: Vec<(AddressHash, *mut dyn ContractTrait)>,
+}
+impl TestRouter {
+    pub fn new() -> Self {
+        Self {
+            contracts: Vec::new(),
+        }
+    }
 
+    pub fn push(&mut self, address: AddressHash, contract: Box<dyn ContractTrait>) {
+        let contract = Box::into_raw(contract);
+        self.contracts.push((address, contract));
+    }
+
+    pub fn call(&self, address: AddressHash, call_data: Cursor) -> Cursor {
+        if let Some((_, contract_ptr)) = self.contracts.iter().find(|(addr, _)| address.eq(addr)) {
+            unsafe {
+                let mut contract: Box<dyn ContractTrait> = Box::from_raw(*contract_ptr);
+                let result = contract.execute(call_data).unwrap();
+                Box::leak(contract);
+                result
+            }
+        } else {
+            panic!("Contract is not present")
+        }
+    }
+}
+
+#[derive(Clone)]
 pub struct TestContext {
     pub network: Network,
     pub events: alloc::vec::Vec<crate::event::Event>,
     pub global_store: Map<StorageKey, StorageValue>,
     pub cache_store: Map<StorageKey, StorageValue>,
-    pub inputs: alloc::vec::Vec<crate::blockchain::transaction::Input>,
-    pub outputs: alloc::vec::Vec<crate::blockchain::transaction::Output>,
+    pub inputs: Vec<crate::blockchain::transaction::Input>,
+    pub outputs: Vec<crate::blockchain::transaction::Output>,
+    pub router: Option<Rc<RefCell<TestRouter>>>,
 }
 
 impl TestContext {
@@ -28,6 +63,7 @@ impl TestContext {
         global_store: Map<StorageKey, StorageValue>,
         inputs: alloc::vec::Vec<crate::blockchain::transaction::Input>,
         outputs: alloc::vec::Vec<crate::blockchain::transaction::Output>,
+        router: Option<Rc<RefCell<TestRouter>>>,
     ) -> Self {
         Self {
             network,
@@ -36,11 +72,16 @@ impl TestContext {
             cache_store: Map::new(),
             inputs,
             outputs,
+            router,
         }
     }
 }
 
 impl super::Context for TestContext {
+    // Just mock, data are passed from different entry point
+    fn get_call_data(&self, size: usize) -> Cursor {
+        Cursor::new(size)
+    }
     fn emit(&mut self, event: &dyn crate::event::EventTrait) {
         let event = crate::event::Event::new(event.buffer());
         self.events.push(event);
@@ -48,16 +89,24 @@ impl super::Context for TestContext {
 
     fn log(&self, _text: &str) {}
 
-    fn call(&self, buffer: crate::WaBuffer) -> WaBuffer {
-        buffer
+    fn call(
+        &self,
+        address: &crate::blockchain::AddressHash,
+        call_data: crate::cursor::Cursor,
+    ) -> Cursor {
+        if let Some(router) = &self.router {
+            router.borrow().call(address.clone(), call_data)
+        } else {
+            panic!("There is no router associated with a contract")
+        }
     }
 
-    fn deploy(&self, buffer: WaBuffer) -> WaBuffer {
-        buffer
-    }
-
-    fn deploy_from_address(&self, buffer: WaBuffer) -> WaBuffer {
-        buffer
+    fn deploy_from_address(
+        &self,
+        from_address: &crate::blockchain::AddressHash,
+        salt: [u8; 32],
+    ) -> Result<crate::blockchain::AddressHash, crate::error::Error> {
+        Ok(*from_address)
     }
 
     fn encode_address(&self, _address: &str) -> &'static [u8] {
@@ -109,18 +158,23 @@ impl super::Context for TestContext {
         }
     }
 
-    fn next_pointer_greater_than(
-        &self,
-        pointer: crate::storage::StorageKey,
-    ) -> crate::storage::StorageKey {
-        (u256::from_be_bytes(pointer) + 1).to_le_bytes()
-    }
-
-    fn inputs(&self) -> Vec<crate::blockchain::transaction::Input> {
+    fn inputs(&mut self) -> Vec<crate::blockchain::transaction::Input> {
         self.inputs.clone()
     }
 
-    fn outputs(&self) -> Vec<crate::blockchain::transaction::Output> {
+    /*
+    fn iter_inputs(&mut self) -> impl Iterator<Item = &crate::blockchain::transaction::Input> {
+        self.inputs.iter()
+    }
+     */
+
+    fn outputs(&mut self) -> Vec<crate::blockchain::transaction::Output> {
         self.outputs.clone()
     }
+
+    /*
+    fn iter_outputs(&mut self) -> impl Iterator<Item = &crate::blockchain::transaction::Output> {
+        self.outputs.iter()
+    }
+     */
 }

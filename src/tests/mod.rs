@@ -72,10 +72,9 @@ pub fn execute(
     contract: &mut dyn crate::ContractTrait,
     selector: crate::types::Selector,
 ) -> Cursor {
-    let mut buffer = crate::WaBuffer::new(32, 1).unwrap();
-    let mut cursor = buffer.cursor();
+    let mut cursor = Cursor::new(32);
     cursor.write_u32_le(&selector).unwrap();
-    contract.execute(cursor).unwrap().cursor()
+    contract.execute(cursor).unwrap()
 }
 
 pub fn execute_address(
@@ -83,11 +82,10 @@ pub fn execute_address(
     selector: crate::types::Selector,
     address: &AddressHash,
 ) -> Cursor {
-    let mut buffer = crate::WaBuffer::new(64, 1).unwrap();
-    let mut cursor = buffer.cursor();
+    let mut cursor = Cursor::new(64);
     cursor.write_u32_le(&selector).unwrap();
     cursor.write_address(address).unwrap();
-    contract.execute(cursor).unwrap().cursor()
+    contract.execute(cursor).unwrap()
 }
 
 pub fn execute_address_amount(
@@ -96,10 +94,9 @@ pub fn execute_address_amount(
     address: &AddressHash,
     amount: u256,
 ) -> Cursor {
-    let mut buffer = crate::WaBuffer::new(96, 1).unwrap();
-    let mut cursor = buffer.cursor();
+    let mut cursor = Cursor::new(96);
     cursor.write_u32_le(&selector).unwrap();
     cursor.write_address(address).unwrap();
     cursor.write_u256_be(&amount).unwrap();
-    contract.execute(cursor).unwrap().cursor()
+    contract.execute(cursor).unwrap()
 }

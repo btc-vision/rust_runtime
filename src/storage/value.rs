@@ -1,5 +1,7 @@
 use ethnum::u256;
 
+use crate::WaPtr;
+
 #[derive(Copy, Clone, Eq, PartialEq)]
 pub struct StorageValue {
     inner: [u8; crate::constant::STORE_VALUE_SIZE],
@@ -10,9 +12,18 @@ impl StorageValue {
         inner: [0; crate::constant::STORE_VALUE_SIZE],
     };
 
+    pub fn mut_ptr(&mut self) -> WaPtr {
+        WaPtr(self.inner.as_mut_ptr() as *mut u8 as u32)
+    }
+
+    pub fn ptr(&self) -> WaPtr {
+        WaPtr(self.inner.as_ptr() as *const u8 as u32)
+    }
+
     pub fn from_bytes(bytes: [u8; crate::constant::STORE_VALUE_SIZE]) -> Self {
         Self { inner: bytes }
     }
+
     pub fn value(&self) -> [u8; crate::constant::STORE_VALUE_SIZE] {
         self.inner
     }

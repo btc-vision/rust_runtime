@@ -110,7 +110,7 @@ where
     ) -> Self {
         Self {
             context,
-            pointer: encode_pointer(pointer, sub_pointer),
+            pointer: encode_pointer(pointer, &sub_pointer.bytes),
             default_value,
             value: None,
         }
@@ -135,6 +135,7 @@ mod tests {
     use alloc::vec::Vec;
     use ethnum::u256;
 
+    use crate::cursor::Cursor;
     use crate::storage::map::Map;
     use crate::Context;
     use crate::TestContext;
@@ -147,6 +148,7 @@ mod tests {
             Map::new(),
             Vec::new(),
             Vec::new(),
+            None,
         )))
     }
 
