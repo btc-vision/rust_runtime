@@ -3,7 +3,7 @@ use alloc::vec::Vec;
 use core::cell::RefCell;
 
 use crate::{
-    blockchain::AddressHash,
+    blockchain::{AddressHash, Environment},
     cursor::Cursor,
     storage::{StorageKey, StorageValue},
     types::CallData,
@@ -12,18 +12,16 @@ use crate::{
 pub mod op_20;
 
 pub trait ContractTrait {
-    fn set_environment(&mut self, environment: &'static crate::blockchain::Environment);
+    fn context(&self) -> Rc<dyn Context>;
 
-    fn environment(&self) -> &'static crate::blockchain::Environment;
+    fn environment(&mut self) -> &Environment;
 
-    fn context(&self) -> Rc<RefCell<dyn Context>>;
-
-    fn is_self(&self, address: &AddressHash) -> bool {
-        address.eq(&self.environment().address)
+    fn is_self(&mut self, address: &AddressHash) -> bool {
+        address.eq(&self.environment().contract_address)
     }
 
-    fn only_deployer(&self, caller: &AddressHash) -> Result<(), crate::error::Error> {
-        if self.environment().deployer.ne(caller) {
+    fn only_deployer(&mut self, caller: &AddressHash) -> Result<(), crate::error::Error> {
+        if self.environment().contract_deployer.ne(caller) {
             Err(crate::error::Error::OnlyOwner)
         } else {
             Ok(())
@@ -31,69 +29,61 @@ pub trait ContractTrait {
     }
 
     fn on_deploy(&mut self, _call_data: CallData) {
-        self.context().borrow().log("On Deploy is not implemented");
+        self.context().log("On Deploy is not implemented");
     }
 
     fn execute(&mut self, _call_data: CallData) -> Result<Cursor, crate::error::Error> {
-        self.context().borrow().log("Execute is not implemented");
+        self.context().log("Execute is not implemented");
         unimplemented!("Execute needs to be implemented");
     }
 
     fn log(&self, text: &str) {
-        self.context().borrow().log(text);
+        self.context().log(text);
     }
     fn emit(&self, event: &dyn crate::event::EventTrait) {
-        self.context().borrow_mut().emit(event);
+        self.context().emit(event);
     }
     fn call(
         &self,
         address: &crate::blockchain::AddressHash,
         data: crate::cursor::Cursor,
     ) -> Cursor {
-        self.context().borrow().call(address, data)
+        self.context().call(address, data)
     }
 
     fn load(&self, pointer: &StorageKey) -> Option<StorageValue> {
-        self.context().borrow_mut().load(pointer)
+        self.context().load(pointer)
     }
     fn store(&self, pointer: StorageKey, value: StorageValue) {
-        self.context().borrow_mut().store(pointer, value)
+        self.context().store(pointer, value)
     }
     fn exists(&self, pointer: &StorageKey) -> bool {
-        self.context().borrow_mut().exists(pointer)
+        self.context().exists(pointer)
     }
-    /*
-    fn next_pointer_greater_than(&self, pointer: StorageKey) -> StorageKey {
-        self.context()
-            .as_ref()
-            .borrow()
-            .next_pointer_greater_than(pointer)
-    }
-     */
 
     fn encode_address(&self, address: &str) -> &'static [u8] {
-        self.context().borrow().encode_address(address)
+        self.context().encode_address(address)
     }
     fn validate_bitcoin_address(&self, address: &str) -> bool {
-        self.context().borrow().validate_bitcoin_address(address)
+        self.context().validate_bitcoin_address(address)
     }
     fn verify_schnorr_signature(&self, data: &[u8]) -> bool {
-        self.context().borrow().verify_schnorr_signature(data)
+        self.context().verify_schnorr_signature(data)
     }
     fn sha256(&self, data: &[u8]) -> [u8; 32] {
-        self.context().borrow().sha256(data)
+        self.context().sha256(data)
     }
     fn sha256_double(&self, data: &[u8]) -> [u8; 32] {
-        self.context().borrow().sha256_double(data)
+        self.context().sha256_double(data)
     }
     fn ripemd160(&self, data: &[u8]) -> [u8; 20] {
-        self.context().borrow().ripemd160(data)
+        self.context().ripemd160(data)
     }
 
     fn inputs(&self) -> Vec<crate::blockchain::transaction::Input> {
-        self.context().borrow_mut().inputs()
+        self.context().inputs()
     }
     fn outputs(&self) -> Vec<crate::blockchain::transaction::Output> {
-        self.context().borrow_mut().outputs()
+        self.context().outputs()
     }
 }

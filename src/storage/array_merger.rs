@@ -9,7 +9,7 @@ use alloc::rc::Rc;
 
 #[derive(Clone)]
 pub struct ArrayMerger {
-    context: Rc<RefCell<dyn Context>>,
+    context: Rc<dyn Context>,
     parent_key: Vec<u8>,
     pointer: u16,
     default_value: StorageValue,
@@ -17,7 +17,7 @@ pub struct ArrayMerger {
 
 impl ArrayMerger {
     pub fn new(
-        context: Rc<RefCell<dyn Context>>,
+        context: Rc<dyn Context>,
         parent_key: Vec<u8>,
         pointer: u16,
         default_value: StorageValue,
@@ -31,20 +31,17 @@ impl ArrayMerger {
     }
     pub fn get<'a>(&mut self, key: &[u8]) -> StorageValue {
         let pointer = self.get_key_hash(key);
-        self.context
-            .borrow_mut()
-            .load(&pointer)
-            .unwrap_or(self.default_value)
+        self.context.load(&pointer).unwrap_or(self.default_value)
     }
 
     pub fn set<'a>(&mut self, key: &[u8], value: StorageValue) {
         let pointer = self.get_key_hash(key);
-        self.context.borrow_mut().store(pointer, value);
+        self.context.store(pointer, value);
     }
 
     pub fn contains_key<'a>(&self, key: &[u8]) -> bool {
         let key = self.get_key_hash(key);
-        self.context.borrow_mut().exists(&key)
+        self.context.exists(&key)
     }
 
     fn get_key_hash(&self, key: &[u8]) -> StorageKey {

@@ -8,7 +8,6 @@ use alloc::rc::Rc;
 use core::cell::RefCell;
 
 #[allow(unused_imports)]
-use rust_runtime::prelude::ContractTrait;
 pub mod contract;
 
 #[cfg(target_arch = "wasm32")]
@@ -21,8 +20,13 @@ static ALLOCATOR: LeakingPageAllocator = LeakingPageAllocator;
 #[cfg(target_arch = "wasm32")]
 #[export_name = "start"]
 pub unsafe fn start() {
+    return;
+
     use rust_runtime::env::global::GlobalContext;
-    let context = Rc::new(RefCell::new(GlobalContext::new()));
+    use rust_runtime::Context;
+    let context = Rc::new(GlobalContext::new());
+
+    context.log("Hello world");
     rust_runtime::CONTRACT = Some(Rc::new(RefCell::new(crate::contract::Contract::new(
         context,
     ))));

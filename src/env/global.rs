@@ -1,8 +1,8 @@
-use alloc::vec::Vec;
-
 use crate::{
-    blockchain::{transaction::Input, AddressHash},
-    cursor::Cursor,
+    blockchain::{
+        environment, transaction::Input, AddressHash, BlockHash, Environment, TransactionHash,
+    },
+    cursor::{self, Cursor},
     storage::{
         key::{self, StorageKey},
         map::Map,
@@ -10,18 +10,23 @@ use crate::{
     },
     WaPtr,
 };
+use alloc::vec::Vec;
+use core::cell::RefCell;
 use ethnum::u256;
 
 #[link(wasm_import_module = "env")]
 extern "C" {
     pub fn revert(data: u32, length: u32);
 
-    #[link_name = "getCalldata"]
+    #[link_name = "calldata"]
     pub fn get_call_data(offset: u32, length: u32, result: WaPtr);
 
-    pub fn load(key: u32, result: u32);
+    #[link_name = "environment"]
+    pub fn get_environment(offset: u32, length: u32, result: WaPtr);
 
-    pub fn store(key: u32, value: u32);
+    pub fn load(key: WaPtr, result: WaPtr);
+
+    pub fn store(key: WaPtr, value: WaPtr);
 
     #[link_name = "deployFromAddress"]
     pub fn deploy_from_address(origin_address: u32, salt: u32, result_address: u32) -> u32;
@@ -48,40 +53,36 @@ extern "C" {
     #[link_name = "inputsSize"]
     pub fn inputs_size() -> u32;
 
-    pub fn inputs(buffer: u32);
+    pub fn inputs(buffer: WaPtr);
 
     #[link_name = "outputsSize"]
     pub fn outputs_size() -> u32;
 
-    pub fn outputs(buffer: u32);
+    pub fn outputs(buffer: WaPtr);
 }
 
 #[link(wasm_import_module = "debug")]
 extern "C" {
-    pub fn log(ptr: u32);
+    pub fn log(ptr: u32, len: u32);
 }
 
 //#[cfg(target_arch = "wasm32")]
 pub struct GlobalContext {
-    store: Map<StorageKey, StorageValue>,
-    inputs: Option<Vec<crate::blockchain::transaction::Input>>,
-    outputs: Option<Vec<crate::blockchain::transaction::Output>>,
+    store: RefCell<Map<StorageKey, StorageValue>>,
 }
 
 //#[cfg(target_arch = "wasm32")]
 impl GlobalContext {
     pub const fn new() -> Self {
         Self {
-            store: Map::new(),
-            inputs: None,
-            outputs: None,
+            store: RefCell::new(Map::new()),
         }
     }
 }
 
 //#[cfg(target_arch = "wasm32")]
 impl super::Context for GlobalContext {
-    fn get_call_data(&self, size: usize) -> Cursor {
+    fn call_data(&self, size: usize) -> Cursor {
         let cursor = crate::cursor::Cursor::new(size);
         unsafe {
             get_call_data(0, size as u32, cursor.ptr());
@@ -89,19 +90,45 @@ impl super::Context for GlobalContext {
         cursor
     }
 
-    fn log(&self, text: &str) {
+    fn environment(&self) -> Environment {
         unsafe {
-            let bytes = text
-                .as_bytes()
-                .iter()
-                .chain(b"\0".iter())
-                .cloned()
-                .collect::<alloc::vec::Vec<u8>>();
-            log(bytes.as_ptr() as u32);
+            let mut cursor = Cursor::new(crate::constant::ENVIRONMENT_SIZE);
+            get_environment(0, crate::constant::ENVIRONMENT_SIZE as u32, cursor.ptr());
+
+            Environment {
+                block_hash: BlockHash {
+                    bytes: cursor
+                        .read_bytes(crate::constant::BLOCK_HASH_LENGTH)
+                        .unwrap()
+                        .try_into()
+                        .unwrap(),
+                },
+                block_number: cursor.read_u64_le().unwrap(),
+                block_median_time: cursor.read_u64_le().unwrap(),
+                transaction_hash: TransactionHash {
+                    bytes: cursor
+                        .read_bytes(crate::constant::TRANSACTION_HASH_LENGTH)
+                        .unwrap()
+                        .try_into()
+                        .unwrap(),
+                },
+                contract_address: cursor.read_address().unwrap(),
+                contract_deployer: cursor.read_address().unwrap(),
+                caller: cursor.read_address().unwrap(),
+                origin: cursor.read_address().unwrap(),
+            }
         }
     }
 
-    fn emit(&mut self, event: &dyn crate::event::EventTrait) {
+    fn log(&self, text: &str) {
+        unsafe {
+            let mut cursor = Cursor::new(text.as_bytes().len() + 3);
+            cursor.write_string_with_len(text).unwrap();
+            log(cursor.ptr().0, cursor.write_pos() as u32);
+        }
+    }
+
+    fn emit(&self, event: &dyn crate::event::EventTrait) {
         unsafe {
             emit(event.ptr(), event.buffer().len() as u32);
         }
@@ -131,47 +158,53 @@ impl super::Context for GlobalContext {
         false
     }
 
-    fn load(&mut self, pointer: &StorageKey) -> Option<StorageValue> {
+    fn load(&self, pointer: &StorageKey) -> Option<StorageValue> {
         unsafe {
-            let mut value = StorageValue::from_bytes([0; 32]);
-            load(pointer.ptr().0, value.ptr().0);
-
-            if value.eq(&StorageValue::ZERO) {
-                None
+            let value = StorageValue::from_bytes([0; 32]);
+            if let Some(value) = self.store.borrow().get(pointer) {
+                Some(value.clone())
             } else {
-                self.store.insert(*pointer, value.clone());
-                Some(value)
+                load(pointer.ptr(), value.ptr());
+
+                if value.eq(&StorageValue::ZERO) {
+                    None
+                } else {
+                    self.store.borrow_mut().insert(*pointer, value.clone());
+                    Some(value)
+                }
             }
         }
     }
 
-    fn exists(&mut self, pointer: &StorageKey) -> bool {
-        if self.store.contains_key(pointer) {
+    fn exists(&self, pointer: &StorageKey) -> bool {
+        if self.store.borrow().contains_key(pointer) {
             true
         } else {
             self.load(pointer).is_some()
         }
     }
 
-    fn store(&mut self, pointer: StorageKey, value: StorageValue) {
+    fn store(&self, pointer: StorageKey, value: StorageValue) {
         unsafe {
-            if if let Some(old) = self.store.get(&pointer) {
+            if if let Some(old) = self.store.borrow().get(&pointer) {
                 value.ne(old)
             } else {
                 false
             } {
-                self.store.insert(pointer, value);
-                store(pointer.ptr().0, value.ptr().0)
+                self.store.borrow_mut().insert(pointer, value);
+                store(pointer.ptr(), value.ptr())
             }
         }
     }
 
-    fn inputs(&mut self) -> alloc::vec::Vec<crate::blockchain::transaction::Input> {
-        if let Some(inputs) = &self.inputs {
-            inputs.clone()
-        } else {
-            Vec::new()
+    fn inputs(&self) -> alloc::vec::Vec<crate::blockchain::transaction::Input> {
+        unsafe {
+            let size = inputs_size();
+            let buffer = Cursor::new(size as usize);
+            inputs(buffer.ptr());
         }
+
+        alloc::vec::Vec::new()
     }
 
     /*
@@ -184,12 +217,14 @@ impl super::Context for GlobalContext {
     }
      */
 
-    fn outputs(&mut self) -> alloc::vec::Vec<crate::blockchain::transaction::Output> {
-        if let Some(outputs) = &self.outputs {
-            outputs.clone()
-        } else {
-            Vec::new()
+    fn outputs(&self) -> alloc::vec::Vec<crate::blockchain::transaction::Output> {
+        unsafe {
+            let size = outputs_size();
+            let buffer = Cursor::new(size as usize);
+            outputs(buffer.ptr());
         }
+
+        alloc::vec::Vec::new()
     }
 
     /*

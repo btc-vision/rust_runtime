@@ -22,7 +22,7 @@ where
     StorageValue: Into<T>,
     D: Into<T> + Clone,
 {
-    context: Rc<RefCell<dyn Context>>,
+    context: Rc<dyn Context>,
     pointer: StorageKey,
     default_value: D,
     value: Option<T>,
@@ -40,7 +40,6 @@ where
         } else {
             let value: T = self
                 .context
-                .borrow_mut()
                 .load(&self.pointer)
                 .map(|value| value.into())
                 .unwrap_or(self.default_value.clone().into());
@@ -52,7 +51,7 @@ where
 
     fn set(&mut self, value: T) -> T {
         if Some(value) != self.value {
-            self.context.borrow_mut().store(self.pointer, value.into());
+            self.context.store(self.pointer, value.into());
             self.value = Some(value);
             value
         } else {
@@ -63,7 +62,6 @@ where
     fn refresh(&mut self) -> T {
         let value: T = self
             .context
-            .borrow_mut()
             .load(&self.pointer)
             .map(|value| value.into())
             .unwrap_or(self.default_value.clone().into());
@@ -78,7 +76,7 @@ where
 
     fn commit(&mut self) {
         if let Some(value) = self.value {
-            self.context.borrow_mut().store(self.pointer, value.into());
+            self.context.store(self.pointer, value.into());
         }
     }
 }
@@ -89,11 +87,7 @@ where
     StorageValue: Into<T>,
     D: Into<T> + Clone,
 {
-    pub const fn new_const(
-        context: Rc<RefCell<dyn Context>>,
-        pointer: u16,
-        default_value: D,
-    ) -> Self {
+    pub const fn new_const(context: Rc<dyn Context>, pointer: u16, default_value: D) -> Self {
         Self {
             context,
             pointer: crate::math::abi::encode_pointer_const(pointer),
@@ -103,7 +97,7 @@ where
     }
 
     pub fn new(
-        context: Rc<RefCell<dyn Context>>,
+        context: Rc<dyn Context>,
         pointer: u16,
         sub_pointer: &StorageKey,
         default_value: D,
@@ -142,14 +136,8 @@ mod tests {
 
     use super::StoredTrait;
 
-    fn context() -> Rc<RefCell<dyn Context>> {
-        Rc::new(RefCell::new(TestContext::new(
-            crate::env::Network::Testnet,
-            Map::new(),
-            Vec::new(),
-            Vec::new(),
-            None,
-        )))
+    fn context() -> Rc<dyn Context> {
+        Rc::new(TestContext::default())
     }
 
     #[test]

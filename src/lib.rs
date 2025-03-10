@@ -26,7 +26,9 @@ use core::cell::RefCell;
 use alloc::rc::Rc;
 pub use env::*;
 pub use ethnum;
-//pub use mem::WaBuffer;
+
+#[cfg(not(target_arch = "wasm32"))]
+pub use bitcoin;
 pub use utils::*;
 
 pub use contract::{
@@ -36,6 +38,7 @@ pub use contract::{
 
 pub static mut CONTRACT: Option<Rc<RefCell<dyn contract::ContractTrait>>> = None;
 
+#[repr(transparent)]
 pub struct WaPtr(u32);
 
 impl From<&u32> for WaPtr {
@@ -64,21 +67,20 @@ fn panic(_panic: &core::panic::PanicInfo<'_>) -> ! {
     core::arch::wasm32::unreachable()
 }
 
-//#[cfg(target_arch = "wasm32")]
+#[cfg(target_arch = "wasm32")]
 #[allow(static_mut_refs)]
 #[export_name = "execute"]
 pub unsafe fn execute(length: u32) -> WaPtr {
     if let Some(contract) = &mut CONTRACT {
         let mut contract = contract.borrow_mut();
 
-        let call_data = contract
-            .context()
-            .borrow_mut()
-            .get_call_data(length as usize);
+        contract.context().log("Log message");
+
+        let call_data = contract.context().call_data(length as usize);
 
         contract.execute(call_data).unwrap().ptr()
     } else {
-        panic!("Contract is not set")
+        return WaPtr(20);
     }
 }
 
@@ -87,17 +89,4 @@ pub unsafe fn execute(length: u32) -> WaPtr {
 #[allow(static_mut_refs)]
 pub unsafe fn on_deploy(ptr: WaPtr) {
     // problematic input!!!
-}
-
-#[cfg(target_arch = "wasm32")]
-#[export_name = "setEnvironment"]
-#[allow(static_mut_refs)]
-pub unsafe fn set_environment(ptr: u32) {
-    use blockchain::Environment;
-
-    let environment = core::ptr::NonNull::new_unchecked(ptr as *mut Environment).as_mut();
-    if let Some(contract) = &mut CONTRACT {
-        let mut contract = contract.borrow_mut();
-        contract.set_environment(environment);
-    }
 }

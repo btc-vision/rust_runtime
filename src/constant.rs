@@ -4,3 +4,5 @@ pub const TRANSACTION_HASH_LENGTH: usize = HASH_SIZE;
 pub const BLOCK_HASH_LENGTH: usize = HASH_SIZE;
 pub const STORE_KEY_SIZE: usize = HASH_SIZE;
 pub const STORE_VALUE_SIZE: usize = HASH_SIZE;
+
+pub const ENVIRONMENT_SIZE: usize = 208;

@@ -12,59 +12,29 @@ pub fn random_bytes() -> [u8; 32] {
     result
 }
 
-#[cfg(target_arch = "wasm32")]
-pub fn random_bytes() -> [u8; 32] {
-    static mut value: u8 = 9;
-    let mut result = [0u8; 32];
-    result.iter_mut().for_each(|b| unsafe {
-        value += 13;
-        *b = value;
-    });
-    result
-}
-
 #[cfg(not(target_arch = "wasm32"))]
 pub fn random_u64() -> u64 {
     rand::random()
 }
 
-#[cfg(target_arch = "wasm32")]
-pub fn random_u64() -> u64 {
-    unsafe {
-        static mut value: u64 = 9;
-        value += 19;
-        value
-    }
-}
-
+#[cfg(not(target_arch = "wasm32"))]
 pub fn random_address() -> AddressHash {
     AddressHash {
         bytes: random_bytes(),
     }
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 pub fn random_transaction() -> TransactionHash {
     TransactionHash {
         bytes: random_bytes(),
     }
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 pub fn random_block() -> BlockHash {
     BlockHash {
         bytes: random_bytes(),
-    }
-}
-
-pub fn random_environment() -> Environment {
-    Environment {
-        address: random_address(),
-        block_hash: random_block(),
-        deployer: random_address(),
-        sender: random_address(),
-        origin: random_address(),
-        transaction_hash: random_transaction(),
-        timestamp: 0,
-        safe_rnd: random_u64(),
     }
 }
 

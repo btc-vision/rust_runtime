@@ -145,6 +145,6 @@ impl EventTrait for Event {
     }
 
     fn ptr(&self) -> u32 {
-        (self.buffer.as_ptr() as u32)
+        self.buffer.as_ptr() as u32
     }
 }

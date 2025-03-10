@@ -59,7 +59,7 @@ pub trait OP20Trait: super::ContractTrait {
         match selector {
             SELECTOR_OWNER => {
                 let mut cursor = Cursor::new(ADDRESS_BYTE_LENGTH);
-                cursor.write_address(&self.environment().deployer)?;
+                cursor.write_address(&self.environment().contract_deployer)?;
                 Ok(cursor)
             }
             SELECTOR_DECIMALS => {
@@ -171,7 +171,7 @@ pub trait OP20Trait: super::ContractTrait {
         &mut self,
         mut call_data: CallData,
     ) -> Result<crate::cursor::Cursor, crate::error::Error> {
-        let owner = self.environment().sender;
+        let owner = self.environment().caller;
         let spender = call_data.read_address()?;
         let amount = call_data.read_u256_be()?;
 
@@ -197,12 +197,14 @@ pub trait OP20Trait: super::ContractTrait {
     }
 
     fn burn_base(&mut self, value: u256, only_deployer: bool) -> Result<bool, crate::error::Error> {
+        let sender = self.environment().caller;
+
         if value.eq(&u256::ZERO) {
             return Err(crate::error::Error::NoTokens);
         }
 
         if only_deployer {
-            self.only_deployer(&self.environment().sender)?;
+            self.only_deployer(&sender)?;
         }
 
         let total_supply = self.total_supply().value();
@@ -210,7 +212,6 @@ pub trait OP20Trait: super::ContractTrait {
             return Err(crate::error::Error::InsufficientTotalSupply);
         }
 
-        let sender = self.environment().sender;
         if !self.balance_of_map().contains_key(&sender) {
             return Err(crate::error::Error::NoBalance);
         }
@@ -247,7 +248,8 @@ pub trait OP20Trait: super::ContractTrait {
         only_deployer: bool,
     ) -> Result<bool, crate::error::Error> {
         if only_deployer {
-            self.only_deployer(&self.environment().sender)?;
+            let sender = self.environment().caller.clone();
+            self.only_deployer(&sender)?;
         }
 
         if !self.balance_of_map().contains_key(to) {
@@ -275,7 +277,7 @@ pub trait OP20Trait: super::ContractTrait {
         to: &AddressHash,
         value: u256,
     ) -> Result<bool, crate::error::Error> {
-        let sender = self.environment().sender;
+        let sender = self.environment().caller;
         if self.is_self(&sender) {
             return Err(crate::error::Error::CanNotTransferFromSelfAccount);
         }
@@ -369,7 +371,9 @@ pub trait OP20Trait: super::ContractTrait {
             return Err(crate::error::Error::DeadAddress);
         }
 
-        self.spend_allowance(from, &self.environment().sender, value)?;
+        let sender = self.environment().caller;
+
+        self.spend_allowance(from, &sender, value)?;
         self.transfer_from_unsafe(from, to, value)?;
         Ok(true)
     }
@@ -391,7 +395,7 @@ pub trait OP20Trait: super::ContractTrait {
     fn create_burn_event(&mut self, value: u256) -> Result<(), crate::error::Error> {
         let burn_event = crate::event::Event::burn(value)?;
 
-        self.context().borrow_mut().emit(&burn_event);
+        self.emit(&burn_event);
         Ok(())
     }
 
@@ -402,7 +406,7 @@ pub trait OP20Trait: super::ContractTrait {
         value: u256,
     ) -> Result<(), crate::error::Error> {
         let approve_event = crate::event::Event::approve(deployer, spender, value)?;
-        self.context().borrow_mut().emit(&approve_event);
+        self.emit(&approve_event);
         Ok(())
     }
 
@@ -412,7 +416,7 @@ pub trait OP20Trait: super::ContractTrait {
         amount: u256,
     ) -> Result<(), crate::error::Error> {
         let mint_event = crate::event::Event::mint(deployer, amount)?;
-        self.context().borrow_mut().emit(&mint_event);
+        self.emit(&mint_event);
         Ok(())
     }
 
@@ -423,7 +427,7 @@ pub trait OP20Trait: super::ContractTrait {
         amount: u256,
     ) -> Result<(), crate::error::Error> {
         let transfer_event = crate::event::Event::transfer(from, to, amount)?;
-        self.context().borrow_mut().emit(&transfer_event);
+        self.emit(&transfer_event);
         Ok(())
     }
 }

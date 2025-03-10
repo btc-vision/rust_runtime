@@ -2,6 +2,11 @@
 pub struct TransactionHash {
     pub bytes: [u8; crate::constant::TRANSACTION_HASH_LENGTH],
 }
+impl TransactionHash {
+    pub const EMPTY: TransactionHash = TransactionHash {
+        bytes: [0; crate::constant::TRANSACTION_HASH_LENGTH],
+    };
+}
 impl crate::utils::ToHex for TransactionHash {
     fn get_bytes(&self) -> &[u8] {
         self.bytes.as_ref()

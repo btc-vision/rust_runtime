@@ -1,7 +1,7 @@
 use alloc::rc::Rc;
 use core::cell::RefCell;
 use rust_runtime::{
-    blockchain::AddressHash,
+    blockchain::{AddressHash, Environment},
     contract::op_20::Pointer,
     ethnum::u256,
     math::abi::encode_selector_const,
@@ -20,15 +20,15 @@ const SELECTOR_AIRDROP_WITH_AMOUNT: Selector = encode_selector_const("airdropWit
 const SELECTOR_MINT: Selector = encode_selector_const("mint");
 
 pub struct Contract {
-    environment: Option<&'static rust_runtime::blockchain::Environment>,
+    environment: Option<rust_runtime::blockchain::Environment>,
     params: rust_runtime::contract::op_20::OP20Params,
     balance_of_map: StoredMap<AddressHash, u256>,
     allowance_map: MultiAddressMemoryMap,
     total_supply: StoredU256,
-    context: Rc<RefCell<dyn Context>>,
+    context: Rc<dyn Context>,
 }
 impl Contract {
-    pub fn new(context: Rc<RefCell<dyn Context>>) -> Self {
+    pub fn new(context: Rc<dyn Context>) -> Self {
         Self {
             environment: None,
             params: rust_runtime::contract::op_20::OP20Params {
@@ -79,7 +79,8 @@ impl Contract {
         &mut self,
         mut call_data: CallData,
     ) -> Result<rust_runtime::cursor::Cursor, rust_runtime::error::Error> {
-        self.only_deployer(&self.environment().sender)?;
+        let sender = self.environment().caller;
+        self.only_deployer(&sender)?;
 
         let mut cursor = rust_runtime::cursor::Cursor::new(1);
         let address = call_data.read_address()?;
@@ -93,7 +94,8 @@ impl Contract {
         &mut self,
         mut call_data: CallData,
     ) -> Result<rust_runtime::cursor::Cursor, rust_runtime::error::Error> {
-        self.only_deployer(&self.environment().sender)?;
+        let sender = self.environment().caller;
+        self.only_deployer(&sender)?;
         let drops = call_data.read_address_value_map()?;
         for (address, amount) in drops.iter() {
             self.mint_base(address, amount.clone(), false)?;
@@ -123,7 +125,8 @@ impl Contract {
         &mut self,
         mut call_data: CallData,
     ) -> Result<rust_runtime::cursor::Cursor, rust_runtime::error::Error> {
-        self.only_deployer(&self.environment().sender)?;
+        let sender = self.environment().caller;
+        self.only_deployer(&sender)?;
         let amount = call_data.read_u256_be()?;
         let amount_of_addresses: u32 = call_data.read_u32_le()?;
 
@@ -159,15 +162,14 @@ impl rust_runtime::contract::op_20::OP20Trait for Contract {
 }
 
 impl rust_runtime::contract::ContractTrait for Contract {
-    fn set_environment(&mut self, environment: &'static rust_runtime::blockchain::Environment) {
-        self.environment = Some(environment);
+    fn environment(&mut self) -> &Environment {
+        if self.environment.is_none() {
+            self.environment = Some(self.context().environment());
+        }
+        self.environment.as_ref().unwrap()
     }
 
-    fn environment(&self) -> &'static rust_runtime::blockchain::Environment {
-        self.environment.unwrap()
-    }
-
-    fn context(&self) -> Rc<RefCell<dyn rust_runtime::env::Context>> {
+    fn context(&self) -> Rc<dyn rust_runtime::env::Context> {
         self.context.clone()
     }
 
@@ -189,27 +191,16 @@ mod tests {
     use core::cell::RefCell;
 
     use crate::contract::SELECTOR_MINT;
-    use alloc::{rc::Rc, vec::Vec};
+    use alloc::rc::Rc;
     use rust_runtime::{
-        contract::{
-            self,
-            op_20::{SELECTOR_BALANCE_OF, SELECTOR_NAME, SELECTOR_TOTAL_SUPPLY},
-        },
-        cursor::{self, Cursor},
+        contract::op_20::{SELECTOR_BALANCE_OF, SELECTOR_NAME, SELECTOR_TOTAL_SUPPLY},
+        cursor::Cursor,
         ethnum::u256,
-        storage::map::Map,
-        tests::{execute, execute_address, execute_address_amount, random_environment},
-        Context,
+        tests::{execute, execute_address, execute_address_amount},
     };
 
-    fn context() -> Rc<RefCell<rust_runtime::env::TestContext>> {
-        Rc::new(RefCell::new(rust_runtime::env::TestContext::new(
-            rust_runtime::Network::Mainnet,
-            Map::new(),
-            Vec::new(),
-            Vec::new(),
-            None,
-        )))
+    fn context() -> Rc<rust_runtime::env::TestContext> {
+        Rc::new(rust_runtime::env::TestContext::default())
     }
 
     #[test]
@@ -223,25 +214,18 @@ mod tests {
     #[test]
     fn test_contract_mint() {
         let router = Rc::new(RefCell::new(rust_runtime::env::TestRouter::new()));
-        let context = rust_runtime::env::TestContext::new(
-            rust_runtime::Network::Mainnet,
-            Map::new(),
-            Vec::new(),
-            Vec::new(),
-            Some(router.clone()),
-        );
+        let context = rust_runtime::env::TestContext::default();
 
         let address = rust_runtime::tests::random_address();
         let environment = rust_runtime::blockchain::Environment {
-            deployer: address.clone(),
-            sender: address.clone(),
-            ..random_environment()
+            contract_deployer: address.clone(),
+            caller: address.clone(),
+            ..Default::default()
         };
 
-        let mut contract =
-            alloc::boxed::Box::new(super::Contract::new(Rc::new(RefCell::new(context.clone()))));
+        let mut contract = alloc::boxed::Box::new(super::Contract::new(Rc::new(context.clone())));
 
-        contract.environment = environment.clone().leak();
+        contract.environment = Some(environment.clone());
         router.borrow_mut().push(address.clone(), contract);
 
         let amount = u256::new(10000000);
@@ -277,12 +261,11 @@ mod tests {
 
         let address = rust_runtime::tests::random_address();
 
-        contract.environment = rust_runtime::blockchain::Environment {
-            deployer: address.clone(),
-            sender: address.clone(),
-            ..random_environment()
-        }
-        .leak();
+        contract.environment = Some(rust_runtime::blockchain::Environment {
+            contract_deployer: address.clone(),
+            caller: address.clone(),
+            ..Default::default()
+        });
         let amount = u256::new(10000000);
 
         let mut cursor = execute(&mut contract, SELECTOR_TOTAL_SUPPLY);

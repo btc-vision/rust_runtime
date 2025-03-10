@@ -1,4 +1,5 @@
 use crate::{
+    blockchain::Environment,
     cursor::Cursor,
     storage::{StorageKey, StorageValue},
 };
@@ -11,7 +12,7 @@ pub mod global;
 mod test;
 
 #[cfg(not(target_arch = "wasm32"))]
-pub use test::{Network, TestContext, TestRouter};
+pub use test::{TestContext, TestRouter};
 
 #[cfg(target_arch = "wasm32")]
 pub fn sha256(bytes: &[u8]) -> [u8; 32] {
@@ -65,9 +66,10 @@ pub fn ripemd160(data: &[u8]) -> [u8; 20] {
 }
 
 pub trait Context {
-    fn get_call_data(&self, size: usize) -> Cursor;
+    fn call_data(&self, size: usize) -> Cursor;
+    fn environment(&self) -> Environment;
     fn log(&self, text: &str);
-    fn emit(&mut self, event: &dyn crate::event::EventTrait);
+    fn emit(&self, event: &dyn crate::event::EventTrait);
     fn call(&self, address: &crate::blockchain::AddressHash, data: Cursor) -> Cursor;
 
     fn deploy_from_address(
@@ -76,9 +78,9 @@ pub trait Context {
         salt: [u8; 32],
     ) -> Result<crate::blockchain::AddressHash, crate::error::Error>;
 
-    fn load(&mut self, pointer: &StorageKey) -> Option<StorageValue>;
-    fn store(&mut self, pointer: StorageKey, value: StorageValue);
-    fn exists(&mut self, pointer: &StorageKey) -> bool;
+    fn load(&self, pointer: &StorageKey) -> Option<StorageValue>;
+    fn store(&self, pointer: StorageKey, value: StorageValue);
+    fn exists(&self, pointer: &StorageKey) -> bool;
 
     fn encode_address(&self, address: &str) -> &'static [u8];
     fn validate_bitcoin_address(&self, address: &str) -> bool;
@@ -93,9 +95,9 @@ pub trait Context {
         ripemd160(data)
     }
 
-    fn inputs(&mut self) -> Vec<crate::blockchain::transaction::Input>;
+    fn inputs(&self) -> Vec<crate::blockchain::transaction::Input>;
     //fn iter_inputs(&mut self) -> impl Iterator<Item = &crate::blockchain::transaction::Input>;
-    fn outputs(&mut self) -> Vec<crate::blockchain::transaction::Output>;
+    fn outputs(&self) -> Vec<crate::blockchain::transaction::Output>;
     //fn iter_outputs(&mut self) -> impl Iterator<Item = &crate::blockchain::transaction::Output>;
 }
 

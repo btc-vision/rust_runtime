@@ -6,18 +6,14 @@ use crate::{blockchain::AddressHash, Context};
 use super::{array_merger::ArrayMerger, map::Map, StorageValue};
 
 pub struct MultiAddressMemoryMap {
-    context: Rc<RefCell<dyn Context>>,
+    context: Rc<dyn Context>,
     pointer: u16,
     default_value: StorageValue,
     pub map: Map<AddressHash, ArrayMerger>,
 }
 
 impl MultiAddressMemoryMap {
-    pub const fn new(
-        context: Rc<RefCell<dyn Context>>,
-        pointer: u16,
-        default_value: StorageValue,
-    ) -> Self {
+    pub const fn new(context: Rc<dyn Context>, pointer: u16, default_value: StorageValue) -> Self {
         Self {
             context,
             pointer,

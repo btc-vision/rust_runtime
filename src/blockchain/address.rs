@@ -24,6 +24,9 @@ impl AddressHash {
             161, 210, 254, 244, 21, 57, 153, 34, 205, 138, 4, 72, 92, 2,
         ],
     };
+    pub const EMPTY: AddressHash = AddressHash {
+        bytes: [0; crate::constant::ADDRESS_BYTE_LENGTH],
+    };
     pub const fn new_from_bytes(bytes: [u8; crate::constant::ADDRESS_BYTE_LENGTH]) -> Self {
         Self { bytes }
     }
