@@ -67,26 +67,51 @@ fn panic(_panic: &core::panic::PanicInfo<'_>) -> ! {
     core::arch::wasm32::unreachable()
 }
 
-#[cfg(target_arch = "wasm32")]
+//#[cfg(target_arch = "wasm32")]
 #[allow(static_mut_refs)]
 #[export_name = "execute"]
-pub unsafe fn execute(length: u32) -> WaPtr {
+pub unsafe fn execute(length: u32) -> u32 {
     if let Some(contract) = &mut CONTRACT {
         let mut contract = contract.borrow_mut();
 
-        contract.context().log("Log message");
-
         let call_data = contract.context().call_data(length as usize);
 
-        contract.execute(call_data).unwrap().ptr()
+        match contract.execute(call_data) {
+            Ok(result) => {
+                env::global::exit(0, result.ptr(), result.size() as u32);
+                0
+            }
+            Err(err) => {
+                let log_text = alloc::format!("Contract failed with a error: {}", err.as_str());
+                env::global::log(
+                    log_text.as_bytes().as_ptr() as u32,
+                    log_text.as_bytes().len() as u32,
+                );
+                1
+            }
+        }
     } else {
-        return WaPtr(20);
+        let log_text: &str = "Contract is empty";
+        env::global::log(
+            log_text.as_bytes().as_ptr() as u32,
+            log_text.as_bytes().len() as u32,
+        );
+        1
     }
 }
 
 #[cfg(target_arch = "wasm32")]
 #[export_name = "onDeploy"]
 #[allow(static_mut_refs)]
-pub unsafe fn on_deploy(ptr: WaPtr) {
-    // problematic input!!!
+pub unsafe fn on_deploy(length: u32) -> u32 {
+    if let Some(contract) = &mut CONTRACT {
+        let mut contract = contract.borrow_mut();
+
+        let call_data = contract.context().call_data(length as usize);
+        let result = contract.on_deploy(call_data);
+
+        0
+    } else {
+        1
+    }
 }

@@ -20,13 +20,10 @@ static ALLOCATOR: LeakingPageAllocator = LeakingPageAllocator;
 #[cfg(target_arch = "wasm32")]
 #[export_name = "start"]
 pub unsafe fn start() {
-    return;
-
     use rust_runtime::env::global::GlobalContext;
     use rust_runtime::Context;
     let context = Rc::new(GlobalContext::new());
 
-    context.log("Hello world");
     rust_runtime::CONTRACT = Some(Rc::new(RefCell::new(crate::contract::Contract::new(
         context,
     ))));

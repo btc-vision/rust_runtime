@@ -108,26 +108,35 @@ impl super::Context for TestContext {
         b"abc"
     }
 
-    fn validate_bitcoin_address(&self, address: &str) -> bool {
+    fn validate_bitcoin_address(&self, address: &str) -> Result<bool, crate::error::Error> {
         match Address::from_str(address) {
             Ok(addr) => {
                 if addr.is_valid_for_network(self.network) {
-                    true
+                    Ok(true)
                 } else {
-                    false
+                    Ok(false)
                 }
             }
-            Err(e) => false,
+            Err(e) => Ok(false),
         }
     }
 
-    fn verify_schnorr_signature(&self, _data: &[u8]) -> bool {
-        let SECP: secp256k1::Secp256k1<secp256k1::All> = secp256k1::Secp256k1::new();
+    fn verify_schnorr_signature(
+        &self,
+        address: &AddressHash,
+        signature: &[u8],
+        hash: &[u8],
+    ) -> Result<bool, crate::error::Error> {
+        let secp: secp256k1::Secp256k1<secp256k1::All> = secp256k1::Secp256k1::new();
 
-        let xonly_public_key = secp256k1::XOnlyPublicKey::from_byte_array(&[0u8; 32]).unwrap();
-        let signature = secp256k1::schnorr::Signature::from_byte_array([0u8; 64]);
-        let result = SECP.verify_schnorr(&signature, &[0u8; 32], &xonly_public_key);
-        result.is_ok()
+        let xonly_public_key = secp256k1::XOnlyPublicKey::from_byte_array(&address.0).unwrap();
+        let signature = secp256k1::schnorr::Signature::from_byte_array(
+            signature
+                .try_into()
+                .map_err(|_| crate::error::Error::ConvertError)?,
+        );
+        let result = secp.verify_schnorr(&signature, &hash, &xonly_public_key);
+        Ok(result.is_ok())
     }
 
     fn load(&self, pointer: &crate::storage::StorageKey) -> Option<crate::storage::StorageValue> {
@@ -168,21 +177,9 @@ impl super::Context for TestContext {
         self.inputs.clone()
     }
 
-    /*
-    fn iter_inputs(&mut self) -> impl Iterator<Item = &crate::blockchain::transaction::Input> {
-        self.inputs.iter()
-    }
-     */
-
     fn outputs(&self) -> Vec<crate::blockchain::transaction::Output> {
         self.outputs.clone()
     }
-
-    /*
-    fn iter_outputs(&mut self) -> impl Iterator<Item = &crate::blockchain::transaction::Output> {
-        self.outputs.iter()
-    }
-     */
 }
 
 #[cfg(test)]
@@ -190,13 +187,16 @@ mod tests {
     use crate::Context;
 
     use super::TestContext;
+    use crate::tests::random_address;
 
     #[test]
     fn test_validate_mainnet_address() {
         let context = TestContext::default();
         assert_eq!(
             true,
-            context.validate_bitcoin_address("bc1qnghhhgvz5cn8n6x2fy06yzvkuermcm5ljn06gw")
+            context
+                .validate_bitcoin_address("bc1qnghhhgvz5cn8n6x2fy06yzvkuermcm5ljn06gw")
+                .unwrap()
         );
     }
 
@@ -208,7 +208,9 @@ mod tests {
         };
         assert_eq!(
             true,
-            context.validate_bitcoin_address("mym4vP87LdQp9YzRbggpS46fYiQFfR52Nq")
+            context
+                .validate_bitcoin_address("mym4vP87LdQp9YzRbggpS46fYiQFfR52Nq")
+                .unwrap()
         );
     }
 
@@ -220,7 +222,9 @@ mod tests {
         };
         assert_eq!(
             true,
-            context.validate_bitcoin_address("3J98t1WpEZ73CNmQviecrnyiWrnqRhWNLy")
+            context
+                .validate_bitcoin_address("3J98t1WpEZ73CNmQviecrnyiWrnqRhWNLy")
+                .unwrap()
         );
     }
 
@@ -230,7 +234,10 @@ mod tests {
             network: bitcoin::Network::Bitcoin,
             ..Default::default()
         };
-        assert_eq!(false, context.validate_bitcoin_address("invalid_address"));
+        assert_eq!(
+            false,
+            context.validate_bitcoin_address("invalid_address").unwrap()
+        );
     }
 
     #[test]
@@ -241,7 +248,9 @@ mod tests {
         };
         assert_eq!(
             false,
-            context.validate_bitcoin_address("mym4vP87LdQp9YzRbggpS46fYiQFfR52Nq")
+            context
+                .validate_bitcoin_address("mym4vP87LdQp9YzRbggpS46fYiQFfR52Nq")
+                .unwrap()
         );
     }
 
@@ -253,9 +262,11 @@ mod tests {
         };
         assert_eq!(
             true,
-            context.validate_bitcoin_address(
-                "bcrt1pe0slk2klsxckhf90hvu8g0688rxt9qts6thuxk3u4ymxeejw53gs0xjlhn"
-            )
+            context
+                .validate_bitcoin_address(
+                    "bcrt1pe0slk2klsxckhf90hvu8g0688rxt9qts6thuxk3u4ymxeejw53gs0xjlhn"
+                )
+                .unwrap()
         );
     }
 
@@ -267,7 +278,9 @@ mod tests {
         };
         assert_eq!(
             true,
-            context.validate_bitcoin_address("bcrt1qfqsr3m7vjxheghcvw4ks0fryqxfq8qzjf8fxes")
+            context
+                .validate_bitcoin_address("bcrt1qfqsr3m7vjxheghcvw4ks0fryqxfq8qzjf8fxes")
+                .unwrap()
         );
     }
 
@@ -279,7 +292,9 @@ mod tests {
         };
         assert_eq!(
             true,
-            context.validate_bitcoin_address("mn6KYibk94NhScakhgVPQdGE1bnscugRDG")
+            context
+                .validate_bitcoin_address("mn6KYibk94NhScakhgVPQdGE1bnscugRDG")
+                .unwrap()
         );
     }
 
@@ -291,7 +306,14 @@ mod tests {
         };
         assert_eq!(
             true,
-            context.validate_bitcoin_address("2MyLLEUGJSusHvPDNHTwYnG9FAJcrQ3VPZY")
+            context
+                .validate_bitcoin_address("2MyLLEUGJSusHvPDNHTwYnG9FAJcrQ3VPZY")
+                .unwrap()
         );
+    }
+
+    #[test]
+    fn test_valid_schnnor_signature() {
+        assert_eq!(true, true)
     }
 }

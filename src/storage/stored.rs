@@ -122,17 +122,10 @@ pub type StoredAddress = Stored<AddressHash, AddressHash>;
 
 #[cfg(test)]
 mod tests {
-
-    use core::cell::RefCell;
-
-    use alloc::rc::Rc;
-    use alloc::vec::Vec;
-    use ethnum::u256;
-
-    use crate::cursor::Cursor;
-    use crate::storage::map::Map;
     use crate::Context;
     use crate::TestContext;
+    use alloc::rc::Rc;
+    use ethnum::u256;
 
     use super::StoredTrait;
 

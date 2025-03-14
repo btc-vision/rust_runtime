@@ -19,23 +19,21 @@ pub fn random_u64() -> u64 {
 
 #[cfg(not(target_arch = "wasm32"))]
 pub fn random_address() -> AddressHash {
-    AddressHash {
-        bytes: random_bytes(),
-    }
+    AddressHash(random_bytes())
 }
 
 #[cfg(not(target_arch = "wasm32"))]
 pub fn random_transaction() -> TransactionHash {
-    TransactionHash {
-        bytes: random_bytes(),
-    }
+    use crate::FromBytes;
+
+    TransactionHash::from_bytes(&random_bytes())
 }
 
 #[cfg(not(target_arch = "wasm32"))]
 pub fn random_block() -> BlockHash {
-    BlockHash {
-        bytes: random_bytes(),
-    }
+    use crate::FromBytes;
+
+    BlockHash::from_bytes(&random_bytes())
 }
 
 pub fn execute(
@@ -43,7 +41,7 @@ pub fn execute(
     selector: crate::types::Selector,
 ) -> Cursor {
     let mut cursor = Cursor::new(32);
-    cursor.write_u32_le(&selector).unwrap();
+    cursor.write_u32(&selector, true).unwrap();
     contract.execute(cursor).unwrap()
 }
 
@@ -53,7 +51,7 @@ pub fn execute_address(
     address: &AddressHash,
 ) -> Cursor {
     let mut cursor = Cursor::new(64);
-    cursor.write_u32_le(&selector).unwrap();
+    cursor.write_u32(&selector, true).unwrap();
     cursor.write_address(address).unwrap();
     contract.execute(cursor).unwrap()
 }
@@ -65,8 +63,8 @@ pub fn execute_address_amount(
     amount: u256,
 ) -> Cursor {
     let mut cursor = Cursor::new(96);
-    cursor.write_u32_le(&selector).unwrap();
+    cursor.write_u32(&selector, true).unwrap();
     cursor.write_address(address).unwrap();
-    cursor.write_u256_be(&amount).unwrap();
+    cursor.write_u256(&amount, true).unwrap();
     contract.execute(cursor).unwrap()
 }

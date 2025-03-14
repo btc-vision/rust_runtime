@@ -1,5 +1,5 @@
 use crate::{
-    blockchain::Environment,
+    blockchain::{AddressHash, Environment},
     cursor::Cursor,
     storage::{StorageKey, StorageValue},
 };
@@ -83,8 +83,13 @@ pub trait Context {
     fn exists(&self, pointer: &StorageKey) -> bool;
 
     fn encode_address(&self, address: &str) -> &'static [u8];
-    fn validate_bitcoin_address(&self, address: &str) -> bool;
-    fn verify_schnorr_signature(&self, data: &[u8]) -> bool;
+    fn validate_bitcoin_address(&self, address: &str) -> Result<bool, crate::error::Error>;
+    fn verify_schnorr_signature(
+        &self,
+        address: &AddressHash,
+        signature: &[u8],
+        hash: &[u8],
+    ) -> Result<bool, crate::error::Error>;
     fn sha256(&self, data: &[u8]) -> [u8; 32] {
         sha256(data)
     }

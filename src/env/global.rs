@@ -1,22 +1,22 @@
+use alloc::format;
+
 use crate::{
     blockchain::{
-        environment, transaction::Input, AddressHash, BlockHash, Environment, TransactionHash,
+        transaction::{Input, Output},
+        AddressHash, BlockHash, Environment, TransactionHash,
     },
-    cursor::{self, Cursor},
-    storage::{
-        key::{self, StorageKey},
-        map::Map,
-        value::{self, StorageValue},
-    },
-    WaPtr,
+    cursor::Cursor,
+    storage::{key::StorageKey, map::Map, value::StorageValue},
+    FromBytes, WaPtr,
 };
-use alloc::vec::Vec;
+
 use core::cell::RefCell;
-use ethnum::u256;
 
 #[link(wasm_import_module = "env")]
 extern "C" {
     pub fn revert(data: u32, length: u32);
+
+    pub fn exit(status: u32, data: WaPtr, length: u32);
 
     #[link_name = "calldata"]
     pub fn get_call_data(offset: u32, length: u32, result: WaPtr);
@@ -37,6 +37,7 @@ extern "C" {
     pub fn call_result(offset: u32, length: u32, result: u32);
 
     pub fn emit(data: u32, data_length: u32);
+
     #[link_name = "encodeAddress"]
     pub fn encode_address(data: u32) -> u32;
 
@@ -92,26 +93,27 @@ impl super::Context for GlobalContext {
 
     fn environment(&self) -> Environment {
         unsafe {
-            let mut cursor = Cursor::new(crate::constant::ENVIRONMENT_SIZE);
-            get_environment(0, crate::constant::ENVIRONMENT_SIZE as u32, cursor.ptr());
+            let mut cursor = Cursor::new(crate::constant::ENVIRONMENT_BYTE_LENGTH);
+            get_environment(
+                0,
+                crate::constant::ENVIRONMENT_BYTE_LENGTH as u32,
+                cursor.ptr(),
+            );
 
             Environment {
-                block_hash: BlockHash {
-                    bytes: cursor
-                        .read_bytes(crate::constant::BLOCK_HASH_LENGTH)
-                        .unwrap()
-                        .try_into()
+                block_hash: BlockHash::from_bytes(
+                    cursor
+                        .read_bytes(crate::constant::BLOCK_HASH_BYTE_LENGTH)
                         .unwrap(),
-                },
-                block_number: cursor.read_u64_le().unwrap(),
-                block_median_time: cursor.read_u64_le().unwrap(),
-                transaction_hash: TransactionHash {
-                    bytes: cursor
-                        .read_bytes(crate::constant::TRANSACTION_HASH_LENGTH)
-                        .unwrap()
-                        .try_into()
+                ),
+                block_number: cursor.read_u64(true).unwrap(),
+                block_median_time: cursor.read_u64(true).unwrap(),
+                transaction_hash: TransactionHash::from_bytes(
+                    cursor
+                        .read_bytes(crate::constant::TRANSACTION_HASH_BYTE_LENGTH)
                         .unwrap(),
-                },
+                ),
+
                 contract_address: cursor.read_address().unwrap(),
                 contract_deployer: cursor.read_address().unwrap(),
                 caller: cursor.read_address().unwrap(),
@@ -130,7 +132,14 @@ impl super::Context for GlobalContext {
 
     fn emit(&self, event: &dyn crate::event::EventTrait) {
         unsafe {
-            emit(event.ptr(), event.buffer().len() as u32);
+            let buffer = event.buffer();
+            self.log(&format!(
+                "Emit size: {:?} {} {}",
+                buffer,
+                buffer.len(),
+                buffer.as_ptr() as u32
+            ));
+            emit(buffer.as_ptr() as u32, buffer.len() as u32);
         }
     }
 
@@ -150,12 +159,28 @@ impl super::Context for GlobalContext {
         Ok(*from_address)
     }
 
-    fn validate_bitcoin_address(&self, _address: &str) -> bool {
-        false
+    fn validate_bitcoin_address(&self, address: &str) -> Result<bool, crate::error::Error> {
+        unsafe {
+            Ok(validate_bitcoin_address(
+                address.as_bytes().as_ptr() as u32,
+                address.as_bytes().len() as u32,
+            ) != 0)
+        }
     }
 
-    fn verify_schnorr_signature(&self, _data: &[u8]) -> bool {
-        false
+    fn verify_schnorr_signature(
+        &self,
+        address: &AddressHash,
+        signature: &[u8],
+        hash: &[u8],
+    ) -> Result<bool, crate::error::Error> {
+        unsafe {
+            Ok(verify_schnorr_signature(
+                address.ptr().0,
+                signature.as_ptr() as u32,
+                hash.as_ptr() as u32,
+            ) != 0)
+        }
     }
 
     fn load(&self, pointer: &StorageKey) -> Option<StorageValue> {
@@ -197,7 +222,7 @@ impl super::Context for GlobalContext {
         }
     }
 
-    fn inputs(&self) -> alloc::vec::Vec<crate::blockchain::transaction::Input> {
+    fn inputs(&self) -> alloc::vec::Vec<Input> {
         unsafe {
             let size = inputs_size();
             let buffer = Cursor::new(size as usize);
@@ -207,17 +232,7 @@ impl super::Context for GlobalContext {
         alloc::vec::Vec::new()
     }
 
-    /*
-    fn iter_inputs(&mut self) -> impl Iterator<Item = &crate::blockchain::transaction::Input> {
-        if self.inputs.is_none() {
-            self.inputs = Some(Vec::new());
-        }
-
-        self.inputs.as_ref().unwrap().iter()
-    }
-     */
-
-    fn outputs(&self) -> alloc::vec::Vec<crate::blockchain::transaction::Output> {
+    fn outputs(&self) -> alloc::vec::Vec<Output> {
         unsafe {
             let size = outputs_size();
             let buffer = Cursor::new(size as usize);
@@ -226,14 +241,4 @@ impl super::Context for GlobalContext {
 
         alloc::vec::Vec::new()
     }
-
-    /*
-    fn iter_outputs(&mut self) -> impl Iterator<Item = &crate::blockchain::transaction::Output> {
-        if self.outputs.is_none() {
-            self.outputs = Some(Vec::new());
-        }
-
-        self.outputs.as_ref().unwrap().iter()
-    }
-     */
 }

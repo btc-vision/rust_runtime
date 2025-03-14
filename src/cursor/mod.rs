@@ -68,6 +68,10 @@ impl Cursor {
     pub fn ptr(&self) -> WaPtr {
         WaPtr((self.inner.as_ptr()) as u32)
     }
+
+    pub fn size(&self) -> usize {
+        self.inner.len()
+    }
 }
 
 #[cfg(test)]
@@ -80,18 +84,18 @@ mod tests {
         let mut cursor = super::Cursor::from_slice(alloc::boxed::Box::leak(mem));
 
         cursor.write_u8(1)?;
-        cursor.write_u16_le(&2)?;
-        cursor.write_u32_le(&3)?;
-        cursor.write_u64_le(&4)?;
-        cursor.write_u128_le(&5)?;
-        cursor.write_u256_be(&u256::new(6))?;
+        cursor.write_u16(&2, true)?;
+        cursor.write_u32(&3, true)?;
+        cursor.write_u64(&4, true)?;
+        cursor.write_u128(&5, true)?;
+        cursor.write_u256(&u256::new(6), true)?;
 
         assert_eq!(cursor.read_u8()?, 1);
-        assert_eq!(cursor.read_u16_le()?, 2);
-        assert_eq!(cursor.read_u32_le()?, 3);
-        assert_eq!(cursor.read_u64_le()?, 4);
-        assert_eq!(cursor.read_u128_le()?, 5);
-        assert_eq!(cursor.read_u256_be()?, u256::new(6));
+        assert_eq!(cursor.read_u16(true)?, 2);
+        assert_eq!(cursor.read_u32(true)?, 3);
+        assert_eq!(cursor.read_u64(true)?, 4);
+        assert_eq!(cursor.read_u128(true)?, 5);
+        assert_eq!(cursor.read_u256(true)?, u256::new(6));
 
         Ok(())
     }

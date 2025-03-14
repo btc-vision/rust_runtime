@@ -1,27 +1,30 @@
 use alloc::rc::Rc;
-use core::cell::RefCell;
+use core::{cell::RefCell, ops::Add};
 use rust_runtime::{
     blockchain::{AddressHash, Environment},
     contract::op_20::Pointer,
     ethnum::u256,
     math::abi::encode_selector_const,
     storage::{
+        map::Map,
         multi_address_map::MultiAddressMemoryMap,
         stored::{StoredTrait, StoredU256, StoredU8},
-        stored_map::StoredMap,
+        stored_map::{StoredAddresValueMap, StoredMap},
         StorageValue,
     },
     types::{CallData, Selector},
     Context, ContractTrait, OP20Trait,
 };
 
-const SELECTOR_AIRDROP: Selector = encode_selector_const("airdrop");
-const SELECTOR_AIRDROP_WITH_AMOUNT: Selector = encode_selector_const("airdropWithAmount");
-const SELECTOR_MINT: Selector = encode_selector_const("mint");
+const SELECTOR_AIRDROP: Selector = encode_selector_const("airdrop(address)");
+const SELECTOR_AIRDROP_WITH_AMOUNT: Selector =
+    encode_selector_const("airdropWithAmount(address, address[]");
+const SELECTOR_MINT: Selector = encode_selector_const("mint(address,uint256)");
 
 pub struct Contract {
     environment: Option<rust_runtime::blockchain::Environment>,
     params: rust_runtime::contract::op_20::OP20Params,
+    nonce_map: StoredMap<AddressHash, u256>,
     balance_of_map: StoredMap<AddressHash, u256>,
     allowance_map: MultiAddressMemoryMap,
     total_supply: StoredU256,
@@ -41,6 +44,7 @@ impl Contract {
                 name: "MyToken",
                 symbol: "TOKEN",
             },
+            nonce_map: StoredMap::new(context.clone(), Pointer::NonceMap.u16(), u256::ZERO),
             balance_of_map: StoredMap::new(
                 context.clone(),
                 Pointer::BalanceOfMap.u16(),
@@ -65,11 +69,20 @@ impl Contract {
     fn execute(
         &mut self,
         selector: Selector,
-        call_data: CallData,
+        mut call_data: CallData,
     ) -> Result<rust_runtime::cursor::Cursor, rust_runtime::error::Error> {
         match selector {
-            SELECTOR_MINT => self.mint(call_data),
-            SELECTOR_AIRDROP => self.airdrop(call_data),
+            SELECTOR_MINT => {
+                let address = call_data.read_address()?;
+                let amount = call_data.read_u256(true)?;
+
+                self.mint(address, amount)
+            }
+            SELECTOR_AIRDROP => {
+                let drops = call_data.read_address_value_map()?;
+
+                self.airdrop(drops)
+            }
             SELECTOR_AIRDROP_WITH_AMOUNT => self.airdrop_with_amount(call_data),
             _ => OP20Trait::execute_base(self, selector, call_data),
         }
@@ -77,26 +90,26 @@ impl Contract {
 
     fn mint(
         &mut self,
-        mut call_data: CallData,
+        address: AddressHash,
+        amount: u256,
     ) -> Result<rust_runtime::cursor::Cursor, rust_runtime::error::Error> {
-        let sender = self.environment().caller;
-        self.only_deployer(&sender)?;
+        let caller = self.environment().caller;
+        self.only_deployer(&caller)?;
 
-        let mut cursor = rust_runtime::cursor::Cursor::new(1);
-        let address = call_data.read_address()?;
-        let amount = call_data.read_u256_be()?;
-        cursor.write_bool(self.mint_base(&address, amount, false)?)?;
+        let mut result = rust_runtime::cursor::Cursor::new(1);
 
-        return Ok(cursor);
+        result.write_bool(self.mint_base(&address, amount, false)?)?;
+
+        return Ok(result);
     }
 
     fn airdrop(
         &mut self,
-        mut call_data: CallData,
+        drops: Map<AddressHash, u256>,
     ) -> Result<rust_runtime::cursor::Cursor, rust_runtime::error::Error> {
         let sender = self.environment().caller;
         self.only_deployer(&sender)?;
-        let drops = call_data.read_address_value_map()?;
+
         for (address, amount) in drops.iter() {
             self.mint_base(address, amount.clone(), false)?;
         }
@@ -127,8 +140,8 @@ impl Contract {
     ) -> Result<rust_runtime::cursor::Cursor, rust_runtime::error::Error> {
         let sender = self.environment().caller;
         self.only_deployer(&sender)?;
-        let amount = call_data.read_u256_be()?;
-        let amount_of_addresses: u32 = call_data.read_u32_le()?;
+        let amount = call_data.read_u256(true)?;
+        let amount_of_addresses: u32 = call_data.read_u32(true)?;
 
         for _ in 0..amount_of_addresses {
             let address = call_data.read_address()?;
@@ -158,6 +171,10 @@ impl rust_runtime::contract::op_20::OP20Trait for Contract {
 
     fn balance_of_map(&mut self) -> &mut StoredMap<AddressHash, u256> {
         &mut self.balance_of_map
+    }
+
+    fn nonce_map(&mut self) -> &mut StoredMap<AddressHash, u256> {
+        &mut self.nonce_map
     }
 }
 
@@ -193,10 +210,14 @@ mod tests {
     use crate::contract::SELECTOR_MINT;
     use alloc::rc::Rc;
     use rust_runtime::{
-        contract::op_20::{SELECTOR_BALANCE_OF, SELECTOR_NAME, SELECTOR_TOTAL_SUPPLY},
+        contract::op_20::{
+            SELECTOR_BALANCE_OF, SELECTOR_NAME, SELECTOR_SYMBOL, SELECTOR_TOTAL_SUPPLY,
+        },
         cursor::Cursor,
         ethnum::u256,
+        global::call,
         tests::{execute, execute_address, execute_address_amount},
+        OP20Trait,
     };
 
     fn context() -> Rc<rust_runtime::env::TestContext> {
@@ -207,51 +228,58 @@ mod tests {
     fn test_contract_name() {
         let context = context();
         let mut contract = super::Contract::new(context);
-        let mut cursor = execute(&mut contract, SELECTOR_NAME);
-        assert_eq!(contract.params.name, cursor.read_string_with_len().unwrap());
+        let mut result = contract.execute(SELECTOR_NAME, Cursor::new(0)).unwrap();
+        assert_eq!(contract.params.name, result.read_string_with_len().unwrap());
+    }
+
+    #[test]
+    fn test_contract_symbol() {
+        let context = context();
+        let mut contract = super::Contract::new(context);
+        let mut result = contract.execute(SELECTOR_SYMBOL, Cursor::new(0)).unwrap();
+        assert_eq!(
+            contract.params.symbol,
+            result.read_string_with_len().unwrap()
+        );
     }
 
     #[test]
     fn test_contract_mint() {
         let router = Rc::new(RefCell::new(rust_runtime::env::TestRouter::new()));
-        let context = rust_runtime::env::TestContext::default();
 
+        let contract_address = rust_runtime::tests::random_address();
         let address = rust_runtime::tests::random_address();
+        let amount = u256::new(10000000);
         let environment = rust_runtime::blockchain::Environment {
             contract_deployer: address.clone(),
+            contract_address,
             caller: address.clone(),
             ..Default::default()
         };
+        let context = rust_runtime::env::TestContext {
+            environment,
+            ..Default::default()
+        };
 
-        let mut contract = alloc::boxed::Box::new(super::Contract::new(Rc::new(context.clone())));
+        router.borrow_mut().push(
+            contract_address,
+            alloc::boxed::Box::new(super::Contract::new(Rc::new(context.clone()))),
+        );
 
-        contract.environment = Some(environment.clone());
-        router.borrow_mut().push(address.clone(), contract);
+        let mut call_data = Cursor::new(68);
+        call_data.write_selector(&SELECTOR_MINT).unwrap();
+        call_data.write_address(&address).unwrap();
+        call_data.write_u256(&amount, true).unwrap();
 
-        let amount = u256::new(10000000);
+        let mut result = router.borrow().call(contract_address, call_data);
+        assert_eq!(result.read_bool().unwrap(), true);
 
-        let mut cursor = Cursor::new(4 + 32);
-        cursor.write_selector(&SELECTOR_BALANCE_OF).unwrap();
-        cursor.write_address(&address).unwrap();
-        let mut cursor = router.borrow().call(address.clone(), cursor);
-        assert_eq!(cursor.read_u256_be().unwrap(), 0);
+        let mut call_data = Cursor::new(36);
+        call_data.write_selector(&SELECTOR_BALANCE_OF).unwrap();
+        call_data.write_address(&address).unwrap();
 
-        for i in 0..3 {
-            let mut cursor = rust_runtime::cursor::Cursor::new(4 + 32 + 32);
-            cursor.write_selector(&SELECTOR_MINT).unwrap();
-            cursor.write_address(&address).unwrap();
-            cursor.write_u256_be(&amount).unwrap();
-
-            let mut cursor = router.borrow().call(address.clone(), cursor);
-            assert_eq!(cursor.read_bool().unwrap(), true);
-
-            let mut cursor = Cursor::new(36);
-            cursor.write_selector(&SELECTOR_BALANCE_OF).unwrap();
-            cursor.write_address(&address).unwrap();
-            let mut cursor = router.borrow().call(address.clone(), cursor);
-
-            assert_eq!(cursor.read_u256_be().unwrap(), (i + 1) * amount);
-        }
+        let mut result = router.borrow_mut().call(contract_address, call_data);
+        assert_eq!(result.read_u256(true).unwrap(), amount);
     }
 
     #[test]
@@ -268,19 +296,17 @@ mod tests {
         });
         let amount = u256::new(10000000);
 
-        let mut cursor = execute(&mut contract, SELECTOR_TOTAL_SUPPLY);
-        assert_eq!(cursor.read_u256_be().unwrap(), 0);
+        let mut result = contract
+            .execute(SELECTOR_TOTAL_SUPPLY, Cursor::new(0))
+            .unwrap();
+        assert_eq!(result.read_u256(true).unwrap(), 0);
 
-        for _ in 0..3 {
-            execute_address_amount(&mut contract, SELECTOR_MINT, &address, amount);
-        }
+        let mut result = contract.mint(address.clone(), amount).unwrap();
+        assert_eq!(result.read_bool().unwrap(), true);
 
-        let mut cursor = execute(&mut contract, SELECTOR_TOTAL_SUPPLY);
-        assert_eq!(cursor.read_u256_be().unwrap(), 3 * amount);
-
-        execute_address_amount(&mut contract, SELECTOR_MINT, &address, amount); // mint more
-
-        let mut cursor = execute(&mut contract, SELECTOR_TOTAL_SUPPLY);
-        assert_eq!(cursor.read_u256_be().unwrap(), 4 * amount);
+        let mut result = contract
+            .execute(SELECTOR_TOTAL_SUPPLY, Cursor::new(0))
+            .unwrap();
+        assert_eq!(result.read_u256(true).unwrap(), amount);
     }
 }

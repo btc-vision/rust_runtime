@@ -1,8 +1,9 @@
 use crate::WaPtr;
 
 use super::AddressHash;
+use crate::{AsBytes, ToHex};
 
-#[derive(Clone)]
+#[derive(Clone, Copy)]
 pub struct Environment {
     pub block_hash: super::BlockHash,
     pub block_number: u64,
@@ -24,13 +25,11 @@ impl Environment {
 #[allow(dead_code)]
 #[cfg(not(target_arch = "wasm32"))]
 mod display {
-    use crate::utils::{to_hex, ToHex};
+    use crate::utils::ToHex;
     use core::fmt::Display;
 
     impl Display for super::Environment {
         fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-            use alloc::string::ToString;
-
             f.debug_struct("Environment")
                 .field("block_hash", &self.block_hash.to_hex())
                 .field("block_number", &self.block_number)

@@ -28,10 +28,10 @@ impl Event {
         let mut cursor = Cursor::new(event_type.len() + 6 + byte_size);
 
         cursor.write_string_with_len(event_type)?;
-        cursor.write_u32_le(&(byte_size as u32))?;
+        cursor.write_u32(&(byte_size as u32), true)?;
         cursor.write_address(&owner)?;
         cursor.write_address(&spender)?;
-        cursor.write_u256_be(&value)?;
+        cursor.write_u256(&value, true)?;
 
         Ok(Event {
             buffer: cursor.into_inner(),
@@ -45,8 +45,8 @@ impl Event {
         let mut cursor = Cursor::new(event_type.len() + 6 + byte_size);
 
         cursor.write_string_with_len(event_type)?;
-        cursor.write_u32_le(&(byte_size as u32))?;
-        cursor.write_u256_be(&amount)?;
+        cursor.write_u32(&(byte_size as u32), true)?;
+        cursor.write_u256(&amount, true)?;
 
         Ok(Event {
             buffer: cursor.into_inner(),
@@ -60,8 +60,8 @@ impl Event {
         let mut cursor = Cursor::new(event_type.len() + 6 + byte_size);
 
         cursor.write_string_with_len(event_type)?;
-        cursor.write_u32_le(&(byte_size as u32))?;
-        cursor.write_u256_be(&amount)?;
+        cursor.write_u32(&(byte_size as u32), true)?;
+        cursor.write_u256(&amount, true)?;
 
         Ok(Event {
             buffer: cursor.into_inner(),
@@ -75,9 +75,9 @@ impl Event {
         let mut cursor = Cursor::new(event_type.len() + 6 + byte_size);
 
         cursor.write_string_with_len(event_type)?;
-        cursor.write_u32_le(&(byte_size as u32))?;
+        cursor.write_u32(&(byte_size as u32), true)?;
         cursor.write_address(&address)?;
-        cursor.write_u256_be(&amount)?;
+        cursor.write_u256(&amount, true)?;
 
         Ok(Event {
             buffer: cursor.into_inner(),
@@ -91,8 +91,8 @@ impl Event {
         let mut cursor = Cursor::new(event_type.len() + 6 + byte_size);
 
         cursor.write_string_with_len(event_type)?;
-        cursor.write_u32_le(&(byte_size as u32))?;
-        cursor.write_u256_be(&amount)?;
+        cursor.write_u32(&(byte_size as u32), true)?;
+        cursor.write_u256(&amount, true)?;
 
         Ok(Event {
             buffer: cursor.into_inner(),
@@ -106,8 +106,8 @@ impl Event {
         let mut cursor = Cursor::new(event_type.len() + 6 + byte_size);
 
         cursor.write_string_with_len(event_type)?;
-        cursor.write_u32_le(&(byte_size as u32))?;
-        cursor.write_u256_be(&amount)?;
+        cursor.write_u32(&(byte_size as u32), true)?;
+        cursor.write_u256(&amount, true)?;
 
         Ok(Event {
             buffer: cursor.into_inner(),
@@ -127,11 +127,11 @@ impl Event {
 
         cursor.write_string_with_len(event_type)?;
 
-        cursor.write_u32_le(&(byte_size as u32))?;
+        cursor.write_u32(&(byte_size as u32), true)?;
 
         cursor.write_address(&addr_from)?;
         cursor.write_address(&addr_to)?;
-        cursor.write_u256_be(&amount)?;
+        cursor.write_u256(&amount, true)?;
 
         Ok(Event {
             buffer: cursor.into_inner(),

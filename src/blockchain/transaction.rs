@@ -1,17 +1,24 @@
-#[derive(Clone, Debug)]
-pub struct TransactionHash {
-    pub bytes: [u8; crate::constant::TRANSACTION_HASH_LENGTH],
-}
+use crate::{AsBytes, FromBytes, ToHex};
+
+#[derive(Clone, Copy, Debug)]
+#[repr(transparent)]
+pub struct TransactionHash([u8; crate::constant::TRANSACTION_HASH_BYTE_LENGTH]);
 impl TransactionHash {
-    pub const EMPTY: TransactionHash = TransactionHash {
-        bytes: [0; crate::constant::TRANSACTION_HASH_LENGTH],
-    };
+    pub const EMPTY: TransactionHash =
+        TransactionHash([0; crate::constant::TRANSACTION_HASH_BYTE_LENGTH]);
 }
-impl crate::utils::ToHex for TransactionHash {
-    fn get_bytes(&self) -> &[u8] {
-        self.bytes.as_ref()
+impl AsBytes for TransactionHash {
+    fn as_bytes(&self) -> &[u8] {
+        &self.0
     }
 }
+
+impl FromBytes for TransactionHash {
+    fn from_bytes(bytes: &[u8]) -> Self {
+        Self(bytes.try_into().unwrap())
+    }
+}
+impl ToHex for TransactionHash {}
 
 #[derive(Clone, Debug)]
 pub struct Transaction {

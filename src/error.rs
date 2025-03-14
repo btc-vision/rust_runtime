@@ -15,9 +15,12 @@ pub enum Error {
     OnlyOwner,
     NoTokens,
     InsufficientAllowance,
+    ConvertError,
+    ParseError,
 
     Test,
 
+    Revert(&'static str),
     Extra(&'static str),
 }
 
@@ -38,7 +41,12 @@ impl Error {
             Self::OnlyOwner => "OnlyOwner",
             Self::NoTokens => "NoTokens",
             Self::InsufficientAllowance => "InsufficientAllowance",
+            Self::ConvertError => "Convert error",
+            Self::ParseError => "ParseError",
+
             Self::Test => "Test",
+
+            Self::Revert(err) => err,
             Self::Extra(err) => err,
         }
     }

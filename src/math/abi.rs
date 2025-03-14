@@ -25,7 +25,7 @@ pub fn encode_selector(selector: &str) -> crate::types::Selector {
 }
 
 pub const fn encode_pointer_const(unique_identifier: u16) -> StorageKey {
-    let mut key = [0; crate::constant::STORE_KEY_SIZE];
+    let mut key = [0; crate::constant::STORE_KEY_BYTE_LENGTH];
     key[0] = (unique_identifier & 0xff) as u8;
     key[1] = ((unique_identifier >> 8) & 0xff) as u8;
 

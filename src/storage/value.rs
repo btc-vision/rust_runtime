@@ -1,15 +1,15 @@
 use ethnum::u256;
 
-use crate::WaPtr;
+use crate::{AsBytes, WaPtr};
 
 #[derive(Copy, Clone, Eq, PartialEq)]
 pub struct StorageValue {
-    inner: [u8; crate::constant::STORE_VALUE_SIZE],
+    inner: [u8; crate::constant::STORE_VALUE_BYTE_LENGTH],
 }
 
 impl StorageValue {
     pub const ZERO: StorageValue = StorageValue {
-        inner: [0; crate::constant::STORE_VALUE_SIZE],
+        inner: [0; crate::constant::STORE_VALUE_BYTE_LENGTH],
     };
 
     pub fn mut_ptr(&mut self) -> WaPtr {
@@ -20,16 +20,12 @@ impl StorageValue {
         WaPtr(self.inner.as_ptr() as *const u8 as u32)
     }
 
-    pub fn from_bytes(bytes: [u8; crate::constant::STORE_VALUE_SIZE]) -> Self {
+    pub fn from_bytes(bytes: [u8; crate::constant::STORE_VALUE_BYTE_LENGTH]) -> Self {
         Self { inner: bytes }
     }
 
-    pub fn value(&self) -> [u8; crate::constant::STORE_VALUE_SIZE] {
+    pub fn value(&self) -> [u8; crate::constant::STORE_VALUE_BYTE_LENGTH] {
         self.inner
-    }
-
-    pub fn bytes(&self) -> &[u8] {
-        &self.inner
     }
 
     pub fn bool(&self) -> bool {
@@ -65,22 +61,28 @@ impl StorageValue {
     }
 }
 
-impl From<[u8; crate::constant::STORE_VALUE_SIZE]> for StorageValue {
-    fn from(value: [u8; crate::constant::STORE_VALUE_SIZE]) -> Self {
+impl AsBytes for StorageValue {
+    fn as_bytes(&self) -> &[u8] {
+        &self.inner
+    }
+}
+
+impl From<[u8; crate::constant::STORE_VALUE_BYTE_LENGTH]> for StorageValue {
+    fn from(value: [u8; crate::constant::STORE_VALUE_BYTE_LENGTH]) -> Self {
         StorageValue { inner: value }
     }
 }
 
-impl From<&[u8; crate::constant::STORE_VALUE_SIZE]> for StorageValue {
-    fn from(value: &[u8; crate::constant::STORE_VALUE_SIZE]) -> Self {
+impl From<&[u8; crate::constant::STORE_VALUE_BYTE_LENGTH]> for StorageValue {
+    fn from(value: &[u8; crate::constant::STORE_VALUE_BYTE_LENGTH]) -> Self {
         StorageValue { inner: *value }
     }
 }
 
 impl From<&[u8]> for StorageValue {
     fn from(value: &[u8]) -> Self {
-        let mut inner = [0u8; crate::constant::STORE_VALUE_SIZE];
-        let length = value.len().min(crate::constant::STORE_VALUE_SIZE);
+        let mut inner = [0u8; crate::constant::STORE_VALUE_BYTE_LENGTH];
+        let length = value.len().min(crate::constant::STORE_VALUE_BYTE_LENGTH);
 
         inner[32 - length..32].copy_from_slice(&value[0..length]);
         StorageValue { inner }

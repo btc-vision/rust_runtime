@@ -2,11 +2,11 @@ use crate::WaPtr;
 
 #[derive(Clone, Copy, Eq, PartialEq)]
 pub struct StorageKey {
-    pub bytes: [u8; crate::constant::STORE_KEY_SIZE],
+    pub bytes: [u8; crate::constant::STORE_KEY_BYTE_LENGTH],
 }
 
 impl StorageKey {
-    pub const fn new(bytes: [u8; crate::constant::STORE_KEY_SIZE]) -> Self {
+    pub const fn new(bytes: [u8; crate::constant::STORE_KEY_BYTE_LENGTH]) -> Self {
         Self { bytes }
     }
     pub fn mut_ptr(&mut self) -> WaPtr {

@@ -58,3 +58,25 @@ where
 }
 
 pub type StoredAddresValueMap = StoredMap<AddressHash, u256>;
+
+#[cfg(test)]
+mod tests {
+    use alloc::rc::Rc;
+
+    use crate::{
+        blockchain::AddressHash, storage::StorageValue, tests::random_address, AsBytes, TestContext,
+    };
+
+    use super::StoredMap;
+
+    #[test]
+    fn test1() {
+        let context = Rc::new(TestContext::default());
+        let one = [1; 32];
+        let address1 = random_address();
+        let sm: StoredMap<AddressHash, StorageValue> =
+            StoredMap::new(context.clone(), 0, StorageValue::ZERO);
+        sm.set(&address1, StorageValue::from_bytes(one));
+        assert_eq!(sm.get(&address1).as_bytes(), &one);
+    }
+}

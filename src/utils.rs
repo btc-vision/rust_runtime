@@ -1,3 +1,17 @@
+pub trait AsBytes {
+    fn as_bytes(&self) -> &[u8];
+}
+
+pub trait FromBytes {
+    fn from_bytes(bytes: &[u8]) -> Self;
+}
+
+impl AsBytes for &[u8] {
+    fn as_bytes(&self) -> &[u8] {
+        self
+    }
+}
+
 const BASE64_TABLE: [char; 16] = [
     '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'a', 'b', 'c', 'd', 'e', 'f',
 ];
@@ -12,29 +26,26 @@ pub fn to_hex(bytes: &[u8]) -> alloc::string::String {
     }
     string
 }
-pub trait ToHex {
-    fn get_bytes(&self) -> &[u8];
+pub trait ToHex: AsBytes {
     fn to_hex(&self) -> alloc::string::String {
-        to_hex(self.get_bytes())
+        to_hex(self.as_bytes())
     }
 }
 
-impl ToHex for &[u8] {
-    fn get_bytes(&self) -> &[u8] {
-        self
-    }
-}
+impl ToHex for &[u8] {}
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
     pub struct TestHex(alloc::vec::Vec<u8>);
-    impl ToHex for TestHex {
-        fn get_bytes(&self) -> &[u8] {
+    impl AsBytes for TestHex {
+        fn as_bytes(&self) -> &[u8] {
             &self.0
         }
     }
+
+    impl ToHex for TestHex {}
 
     #[test]
     fn test_to_hex() {
