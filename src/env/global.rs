@@ -185,18 +185,34 @@ impl super::Context for GlobalContext {
 
     fn load(&self, pointer: &StorageKey) -> Option<StorageValue> {
         unsafe {
-            let value = StorageValue::from_bytes([0; 32]);
-            if let Some(value) = self.store.borrow().get(pointer) {
-                Some(value.clone())
+            let value = StorageValue::ZERO;
+
+            let result = self.store.borrow().get(pointer).cloned();
+
+            if let Some(value) = result {
+                Some(value)
             } else {
                 load(pointer.ptr(), value.ptr());
 
                 if value.eq(&StorageValue::ZERO) {
                     None
                 } else {
-                    self.store.borrow_mut().insert(*pointer, value.clone());
+                    self.store.borrow_mut().insert(*pointer, value);
                     Some(value)
                 }
+            }
+        }
+    }
+
+    fn store(&self, pointer: StorageKey, value: StorageValue) {
+        unsafe {
+            if if let Some(old) = self.store.borrow().get(&pointer) {
+                value.ne(old)
+            } else {
+                true
+            } {
+                self.store.borrow_mut().insert(pointer, value);
+                store(pointer.ptr(), value.ptr())
             }
         }
     }
@@ -206,19 +222,6 @@ impl super::Context for GlobalContext {
             true
         } else {
             self.load(pointer).is_some()
-        }
-    }
-
-    fn store(&self, pointer: StorageKey, value: StorageValue) {
-        unsafe {
-            if if let Some(old) = self.store.borrow().get(&pointer) {
-                value.ne(old)
-            } else {
-                false
-            } {
-                self.store.borrow_mut().insert(pointer, value);
-                store(pointer.ptr(), value.ptr())
-            }
         }
     }
 

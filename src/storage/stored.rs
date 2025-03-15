@@ -104,7 +104,7 @@ where
     ) -> Self {
         Self {
             context,
-            pointer: encode_pointer(pointer, &sub_pointer.bytes),
+            pointer: encode_pointer(pointer, &sub_pointer.0),
             default_value,
             value: None,
         }

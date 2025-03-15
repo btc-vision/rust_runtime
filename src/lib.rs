@@ -27,6 +27,7 @@ use alloc::rc::Rc;
 pub use env::*;
 pub use ethnum;
 
+pub use crate::constant::DEBUG;
 #[cfg(not(target_arch = "wasm32"))]
 pub use bitcoin;
 pub use utils::*;
@@ -59,6 +60,13 @@ impl From<&[u8; 32]> for WaPtr {
     }
 }
 
+fn log(text: &str) {
+    unsafe {
+        let bytes = text.as_bytes();
+        env::global::log(bytes.as_ptr() as u32, bytes.len() as u32)
+    };
+}
+
 #[cfg(not(test))]
 #[cfg(not(feature = "std"))]
 #[cfg(target_arch = "wasm32")]
@@ -78,24 +86,30 @@ pub unsafe fn execute(length: u32) -> u32 {
 
         match contract.execute(call_data) {
             Ok(result) => {
+                if DEBUG {
+                    log(&alloc::format!(
+                        "Result of contract: {:?}",
+                        result.clone().into_inner()
+                    ));
+                }
+
                 env::global::exit(0, result.ptr(), result.size() as u32);
                 0
             }
             Err(err) => {
-                let log_text = alloc::format!("Contract failed with a error: {}", err.as_str());
-                env::global::log(
-                    log_text.as_bytes().as_ptr() as u32,
-                    log_text.as_bytes().len() as u32,
-                );
+                if DEBUG {
+                    log(&alloc::format!(
+                        "Contract failed with a error: {}",
+                        err.as_str()
+                    ));
+                }
                 1
             }
         }
     } else {
-        let log_text: &str = "Contract is empty";
-        env::global::log(
-            log_text.as_bytes().as_ptr() as u32,
-            log_text.as_bytes().len() as u32,
-        );
+        if DEBUG {
+            log("Contract is empty");
+        }
         1
     }
 }

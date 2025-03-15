@@ -17,6 +17,7 @@ pub enum Error {
     InsufficientAllowance,
     ConvertError,
     ParseError,
+    NoValidAddress,
 
     Test,
 
@@ -43,6 +44,7 @@ impl Error {
             Self::InsufficientAllowance => "InsufficientAllowance",
             Self::ConvertError => "Convert error",
             Self::ParseError => "ParseError",
+            Self::NoValidAddress => "NoValidAddress",
 
             Self::Test => "Test",
 

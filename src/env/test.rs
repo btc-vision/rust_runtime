@@ -117,7 +117,7 @@ impl super::Context for TestContext {
                     Ok(false)
                 }
             }
-            Err(e) => Ok(false),
+            Err(_) => Err(crate::error::Error::NoValidAddress),
         }
     }
 
@@ -184,10 +184,8 @@ impl super::Context for TestContext {
 
 #[cfg(test)]
 mod tests {
-    use crate::Context;
-
     use super::TestContext;
-    use crate::tests::random_address;
+    use crate::Context;
 
     #[test]
     fn test_validate_mainnet_address() {
@@ -314,6 +312,52 @@ mod tests {
 
     #[test]
     fn test_valid_schnnor_signature() {
-        assert_eq!(true, true)
+        use secp256k1::hashes::{sha256, Hash};
+        use secp256k1::rand::rngs::OsRng;
+        let context = TestContext::default();
+
+        let secp: secp256k1::Secp256k1<secp256k1::All> = secp256k1::Secp256k1::new();
+        let (secret_key, public_key) = secp256k1::Secp256k1::new().generate_keypair(&mut OsRng);
+        let keypair = secp256k1::Keypair::from_secret_key(&secp, &secret_key);
+        let msg = sha256::Hash::hash("Hello World!".as_bytes());
+
+        // With random data
+        let signature = secp.sign_schnorr_with_rng(msg.as_byte_array(), &keypair, &mut OsRng);
+        assert!(secp
+            .verify_schnorr(&signature, msg.as_byte_array(), &public_key.into())
+            .is_ok());
+        assert!(context
+            .verify_schnorr_signature(
+                &crate::blockchain::AddressHash(public_key.x_only_public_key().0.serialize()),
+                signature.as_byte_array(),
+                msg.as_byte_array()
+            )
+            .is_ok());
+
+        // NO random data
+        let signature = secp.sign_schnorr_no_aux_rand(msg.as_byte_array(), &keypair);
+        assert!(secp
+            .verify_schnorr(&signature, msg.as_byte_array(), &public_key.into())
+            .is_ok());
+        assert!(context
+            .verify_schnorr_signature(
+                &crate::blockchain::AddressHash(public_key.x_only_public_key().0.serialize()),
+                signature.as_byte_array(),
+                msg.as_byte_array()
+            )
+            .is_ok());
+
+        // Custom random data
+        let signature = secp.sign_schnorr_with_aux_rand(msg.as_byte_array(), &keypair, &[1; 32]);
+        assert!(secp
+            .verify_schnorr(&signature, msg.as_byte_array(), &public_key.into())
+            .is_ok());
+        assert!(context
+            .verify_schnorr_signature(
+                &crate::blockchain::AddressHash(public_key.x_only_public_key().0.serialize()),
+                signature.as_byte_array(),
+                msg.as_byte_array()
+            )
+            .is_ok());
     }
 }

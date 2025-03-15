@@ -73,7 +73,7 @@ mod tests {
             StorageValue::ZERO.as_bytes()
         );
 
-        merger1.set(&address2, StorageValue::from_bytes(one));
+        merger1.set(&address2, StorageValue::new(one));
         assert_eq!(merger1.get(&address2).as_bytes(), &one);
 
         let mut mamm2 = MultiAddressMemoryMap::new(context.clone(), 0, StorageValue::ZERO);

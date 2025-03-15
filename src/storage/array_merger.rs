@@ -79,7 +79,7 @@ impl Eq for ArrayMerger {}
 
 #[cfg(test)]
 mod tests {
-    use crate::{storage::StorageValue, AsBytes};
+    use crate::{storage::StorageValue, AsBytes, FromBytes};
 
     use super::ArrayMerger;
 
@@ -95,7 +95,7 @@ mod tests {
         let value = am1.get(&address2);
         assert_eq!(value.as_bytes(), StorageValue::ZERO.as_bytes());
 
-        am1.set(&address2.as_bytes(), StorageValue::from_bytes(check_value));
+        am1.set(&address2.as_bytes(), StorageValue::new(check_value));
 
         let mut am2 = ArrayMerger::new(context.clone(), address1.0.to_vec(), 0, StorageValue::ZERO);
         let value = am2.get(&address2);

@@ -1,91 +1,94 @@
 use ethnum::u256;
 
-use crate::{AsBytes, WaPtr};
+use crate::{AsBytes, FromBytes, WaPtr};
 
 #[derive(Copy, Clone, Eq, PartialEq)]
-pub struct StorageValue {
-    inner: [u8; crate::constant::STORE_VALUE_BYTE_LENGTH],
-}
+#[repr(transparent)]
+pub struct StorageValue(pub [u8; crate::constant::STORE_VALUE_BYTE_LENGTH]);
 
 impl StorageValue {
-    pub const ZERO: StorageValue = StorageValue {
-        inner: [0; crate::constant::STORE_VALUE_BYTE_LENGTH],
-    };
+    pub const ZERO: StorageValue = StorageValue([0; crate::constant::STORE_VALUE_BYTE_LENGTH]);
+
+    pub fn new(bytes: [u8; crate::constant::STORE_VALUE_BYTE_LENGTH]) -> Self {
+        Self(bytes)
+    }
 
     pub fn mut_ptr(&mut self) -> WaPtr {
-        WaPtr(self.inner.as_mut_ptr() as *mut u8 as u32)
+        WaPtr(self.0.as_mut_ptr() as *mut u8 as u32)
     }
 
     pub fn ptr(&self) -> WaPtr {
-        WaPtr(self.inner.as_ptr() as *const u8 as u32)
-    }
-
-    pub fn from_bytes(bytes: [u8; crate::constant::STORE_VALUE_BYTE_LENGTH]) -> Self {
-        Self { inner: bytes }
+        WaPtr(self.0.as_ptr() as *const u8 as u32)
     }
 
     pub fn value(&self) -> [u8; crate::constant::STORE_VALUE_BYTE_LENGTH] {
-        self.inner
+        self.0
     }
 
     pub fn bool(&self) -> bool {
-        self.inner.iter().any(|v| 0.le(v))
+        self.0.iter().any(|v| 0.le(v))
     }
 
     pub fn zero(&self) -> bool {
-        self.inner.iter().all(|v| 0.eq(v))
+        self.0.iter().all(|v| 0.eq(v))
     }
 
     pub fn u8(&self) -> u8 {
-        self.inner[31]
+        self.0[31]
     }
 
     pub fn u16(&self) -> u16 {
-        u16::from_be_bytes(self.inner[30..32].try_into().unwrap())
+        u16::from_be_bytes(self.0[30..32].try_into().unwrap())
     }
 
     pub fn u32(&self) -> u32 {
-        u32::from_be_bytes(self.inner[28..32].try_into().unwrap())
+        u32::from_be_bytes(self.0[28..32].try_into().unwrap())
     }
 
     pub fn u64(&self) -> u64 {
-        u64::from_be_bytes(self.inner[24..32].try_into().unwrap())
+        u64::from_be_bytes(self.0[24..32].try_into().unwrap())
     }
 
     pub fn u128(&self) -> u128 {
-        u128::from_be_bytes(self.inner[16..32].try_into().unwrap())
+        u128::from_be_bytes(self.0[16..32].try_into().unwrap())
     }
 
     pub fn u256(&self) -> u256 {
-        u256::from_be_bytes(self.inner)
+        u256::from_be_bytes(self.0)
     }
 }
 
 impl AsBytes for StorageValue {
     fn as_bytes(&self) -> &[u8] {
-        &self.inner
+        &self.0
+    }
+}
+
+impl FromBytes for StorageValue {
+    fn from_bytes(bytes: &[u8]) -> Self {
+        let mut inner = [0u8; crate::constant::STORE_VALUE_BYTE_LENGTH];
+        let length = bytes.len().min(crate::constant::STORE_VALUE_BYTE_LENGTH);
+
+        inner[32 - length..32].copy_from_slice(&bytes[0..length]);
+        StorageValue(inner)
     }
 }
 
 impl From<[u8; crate::constant::STORE_VALUE_BYTE_LENGTH]> for StorageValue {
     fn from(value: [u8; crate::constant::STORE_VALUE_BYTE_LENGTH]) -> Self {
-        StorageValue { inner: value }
+        StorageValue(value)
     }
 }
 
 impl From<&[u8; crate::constant::STORE_VALUE_BYTE_LENGTH]> for StorageValue {
     fn from(value: &[u8; crate::constant::STORE_VALUE_BYTE_LENGTH]) -> Self {
-        StorageValue { inner: *value }
+        StorageValue(*value)
     }
 }
 
 impl From<&[u8]> for StorageValue {
     fn from(value: &[u8]) -> Self {
-        let mut inner = [0u8; crate::constant::STORE_VALUE_BYTE_LENGTH];
-        let length = value.len().min(crate::constant::STORE_VALUE_BYTE_LENGTH);
-
-        inner[32 - length..32].copy_from_slice(&value[0..length]);
-        StorageValue { inner }
+        StorageValue::from_bytes(value)
     }
 }
 

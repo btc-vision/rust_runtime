@@ -1,7 +1,7 @@
-use core::{cell::RefCell, marker::PhantomData};
+use core::marker::PhantomData;
 use ethnum::u256;
 
-use crate::{blockchain::AddressHash, math::abi::encode_pointer, Context};
+use crate::{blockchain::AddressHash, math::abi::encode_pointer, AsBytes, Context};
 
 use super::{StorageKey, StorageValue};
 use alloc::rc::Rc;
@@ -35,14 +35,14 @@ where
 
     pub fn set(&self, key: &K, value: V) {
         let key: StorageKey = (*key).into();
-        let key_hash = encode_pointer(self.pointer, &key.bytes);
+        let key_hash = encode_pointer(self.pointer, &key.0);
         let value = Into::<StorageValue>::into(value);
         self.context.store(key_hash, value);
     }
 
     pub fn get(&self, key: &K) -> V {
         let key: StorageKey = (*key).into();
-        let key_hash = encode_pointer(self.pointer, &key.bytes);
+        let key_hash = encode_pointer(self.pointer, &key.0);
         self.context
             .load(&key_hash)
             .map(|value| V::from(value))
@@ -51,7 +51,7 @@ where
 
     pub fn contains_key(&self, key: &K) -> bool {
         let key: StorageKey = (*key).into();
-        let key_hash = encode_pointer(self.pointer, &key.bytes);
+        let key_hash = encode_pointer(self.pointer, key.as_bytes());
         let has = self.context.exists(&key_hash);
         has
     }
@@ -76,7 +76,7 @@ mod tests {
         let address1 = random_address();
         let sm: StoredMap<AddressHash, StorageValue> =
             StoredMap::new(context.clone(), 0, StorageValue::ZERO);
-        sm.set(&address1, StorageValue::from_bytes(one));
+        sm.set(&address1, StorageValue::new(one));
         assert_eq!(sm.get(&address1).as_bytes(), &one);
     }
 }
