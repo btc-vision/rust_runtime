@@ -9,8 +9,8 @@
 
 ```sh
 rustup install nightly # ensure that you have last nightly version
-cargo build --release -p example --target wasm32-unknown-unknown
-wasm-opt -O2 -Oz --strip-debug --strip-dwarf --dce --disable-multimemory --disable-fp16 --disable-mutable-globals --disable-gc --disable-multivalue --disable-nontrapping-float-to-int --disable-threads --mvp-features --remove-unused-module-elements ./target/wasm32-unknown-unknown/release/example.wasm -o ./rust.wasm
+cargo build --release -p op20 --target wasm32-unknown-unknown
+wasm-opt -O2 -Oz --strip-debug --strip-dwarf --dce --disable-multimemory --disable-fp16 --disable-mutable-globals --disable-gc --disable-multivalue --disable-nontrapping-float-to-int --disable-threads --mvp-features --remove-unused-module-elements ./target/wasm32-unknown-unknown/release/op20.wasm -o op20.wasm
 ```
 
 ## Testing
@@ -18,23 +18,18 @@ wasm-opt -O2 -Oz --strip-debug --strip-dwarf --dce --disable-multimemory --disab
 ### With opnet-unit-test on wasm interpreter
 
 ```sh
-cp ./rust.wasm ../opnet-unit-test/bytecode/rust.wasm
-node build/tests/rust.js
+cp ./op20.wasm ../opnet-unit-test/bytecode/MyToken.wasm
+npm run test
 ```
 
 ### Without wasm32 runtime
 
 ```sh
-cargo test --target x86_64-unknown-linux-gnu
+cargo tests
 ```
-
-## Size (outdated)
-
-* Compiled code from [moto library](https://github.com/btc-vision/OP_20): 24KB (24689)
-* Unoptimized code from current Rust library: 45KB (45584)
-* Optimized code with wasm-opt: 33KB (33573)
 
 ## Structure
 
 * `./src/` - Library providing the interface and helper functions for contract interaction
-* `./example/` - Sample smart contract, similar to contract used in unit tests
+* `./op20/` - OP20 smart contract, similar to `https://github.com/btc-vision/OP_20`
+* `./interface` - test `op-vm` ABI, that everything works fine

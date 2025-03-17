@@ -1,4 +1,4 @@
 [alias]
 op20 = "build --release -p op20 --target wasm32-unknown-unknown"
 interface = "build --release -p interface --target wasm32-unknown-unknown"
-test = "cargo test --all --target x86_64-unknown-linux-gnu"
+tests = "test --all"
