@@ -1,8 +1,9 @@
+#[allow(unused_imports)]
 use crate::{
-    cursor::Cursor,
     storage::{StorageKey, StorageValue},
+    AddressHash, AsWaMutPtr, AsWaPtr, AsWaSize, Cursor, Environment, Input, Output,
 };
-use alloc::{collections::binary_heap::Iter, vec::Vec};
+use alloc::vec::Vec;
 #[allow(unused_imports)]
 use core::str::FromStr;
 pub mod global;
@@ -11,20 +12,16 @@ pub mod global;
 mod test;
 
 #[cfg(not(target_arch = "wasm32"))]
-pub use test::{Network, TestContext, TestRouter};
+pub use test::{TestContext, TestRouter};
 
 #[cfg(target_arch = "wasm32")]
 pub fn sha256(bytes: &[u8]) -> [u8; 32] {
-    use crate::math::bytes;
-
     unsafe {
-        //WaBuffer::from_raw(global::sha256(WaBuffer::from_bytes(bytes).unwrap().ptr())).data()
-        let len = bytes.len() as u32;
-        let result = [0u8; 32];
+        let mut result = [0u8; 32];
         global::sha256(
-            bytes.as_ptr() as *const u8 as u32,
-            (&len) as *const _ as *const u8 as u32,
-            result.as_ptr() as *const u8 as u32,
+            bytes.as_wa_ptr(),
+            bytes.as_wa_size(),
+            result.as_wa_mut_ptr(),
         );
         result
     }
@@ -38,16 +35,13 @@ pub fn sha256(bytes: &[u8]) -> [u8; 32] {
 
 #[cfg(target_arch = "wasm32")]
 pub fn ripemd160(bytes: &[u8]) -> [u8; 20] {
-    use crate::{math::bytes, WaPtr};
-
-    let len = bytes.len() as u32;
     let result = [0u8; 20];
 
     unsafe {
         global::ripemd160(
-            WaPtr::from(bytes).0,
-            WaPtr::from(&len).0,
-            WaPtr::from(&result[0..20]).0,
+            bytes.as_wa_ptr(),
+            bytes.as_wa_size(),
+            result[0..20].as_ref().as_wa_ptr(),
         );
         result
     }
@@ -64,25 +58,47 @@ pub fn ripemd160(data: &[u8]) -> [u8; 20] {
     hash[0..20].try_into().unwrap()
 }
 
+#[cfg(target_arch = "wasm32")]
+pub fn log(text: &str) {
+    unsafe {
+        let mut cursor = Cursor::new(text.as_bytes().len() + 3);
+        cursor.write_string_with_len(text).unwrap();
+        global::log(cursor.as_wa_ptr(), cursor.as_wa_size());
+    }
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+pub fn log(text: &str) {
+    libc_print::libc_println!("{}", text);
+}
+
 pub trait Context {
-    fn get_call_data(&self, size: usize) -> Cursor;
-    fn log(&self, text: &str);
-    fn emit(&mut self, event: &dyn crate::event::EventTrait);
-    fn call(&self, address: &crate::blockchain::AddressHash, data: Cursor) -> Cursor;
+    fn call_data(&self, size: usize) -> Cursor;
+    fn environment(&self) -> Environment;
+    fn log(&self, text: &str) {
+        log(text)
+    }
+    fn emit(&self, event: &dyn crate::event::EventTrait);
+    fn call(&self, address: &AddressHash, data: Cursor) -> Cursor;
 
     fn deploy_from_address(
         &self,
-        from_address: &crate::blockchain::AddressHash,
+        from_address: &AddressHash,
         salt: [u8; 32],
-    ) -> Result<crate::blockchain::AddressHash, crate::error::Error>;
+    ) -> Result<AddressHash, crate::error::Error>;
 
-    fn load(&mut self, pointer: &StorageKey) -> Option<StorageValue>;
-    fn store(&mut self, pointer: StorageKey, value: StorageValue);
-    fn exists(&mut self, pointer: &StorageKey) -> bool;
+    fn load(&self, pointer: &StorageKey) -> Option<StorageValue>;
+    fn store(&self, pointer: StorageKey, value: StorageValue);
+    fn exists(&self, pointer: &StorageKey) -> bool;
 
     fn encode_address(&self, address: &str) -> &'static [u8];
-    fn validate_bitcoin_address(&self, address: &str) -> bool;
-    fn verify_schnorr_signature(&self, data: &[u8]) -> bool;
+    fn validate_bitcoin_address(&self, address: &str) -> Result<bool, crate::error::Error>;
+    fn verify_schnorr_signature(
+        &self,
+        address: &AddressHash,
+        signature: &[u8],
+        hash: &[u8],
+    ) -> Result<bool, crate::error::Error>;
     fn sha256(&self, data: &[u8]) -> [u8; 32] {
         sha256(data)
     }
@@ -93,10 +109,8 @@ pub trait Context {
         ripemd160(data)
     }
 
-    fn inputs(&mut self) -> Vec<crate::blockchain::transaction::Input>;
-    //fn iter_inputs(&mut self) -> impl Iterator<Item = &crate::blockchain::transaction::Input>;
-    fn outputs(&mut self) -> Vec<crate::blockchain::transaction::Output>;
-    //fn iter_outputs(&mut self) -> impl Iterator<Item = &crate::blockchain::transaction::Output>;
+    fn inputs(&self) -> Vec<Input>;
+    fn outputs(&self) -> Vec<Output>;
 }
 
 #[cfg(test)]

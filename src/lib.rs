@@ -4,7 +4,6 @@
 #![feature(stmt_expr_attributes)]
 #![feature(str_from_raw_parts)]
 extern crate alloc;
-
 pub mod blockchain;
 pub mod constant;
 pub mod contract;
@@ -15,18 +14,23 @@ pub mod event;
 pub mod math;
 pub mod prelude;
 pub mod storage;
+pub mod tests;
 pub mod types;
 pub mod utils;
-
-//pub mod mem;
-pub mod tests;
 
 use core::cell::RefCell;
 
 use alloc::rc::Rc;
-pub use env::*;
-pub use ethnum;
-//pub use mem::WaBuffer;
+pub use cursor::Cursor;
+pub use env::{global::GlobalContext, log, ripemd160, sha256, Context};
+
+pub use crate::constant::DEBUG;
+#[cfg(not(target_arch = "wasm32"))]
+pub use bitcoin;
+pub use storage::{
+    array_merger::ArrayMerger, map::Map, multi_address_map::MultiAddressMemoryMap, stored::*,
+    StorageKey, StorageValue,
+};
 pub use utils::*;
 
 pub use contract::{
@@ -34,26 +38,25 @@ pub use contract::{
     ContractTrait,
 };
 
+pub use blockchain::{
+    address::AddressHash,
+    block::BlockHash,
+    environment::Environment,
+    transaction::{Input, Output, Transaction, TransactionHash},
+};
+
+pub use types::{CallData, Selector};
+
+pub static CONTEXT: GlobalContext = GlobalContext::new();
 pub static mut CONTRACT: Option<Rc<RefCell<dyn contract::ContractTrait>>> = None;
 
-pub struct WaPtr(u32);
+//pub use ethnum::U256;
 
-impl From<&u32> for WaPtr {
-    fn from(value: &u32) -> Self {
-        Self(value as *const _ as *mut u8 as u32)
-    }
-}
+#[macro_use]
+extern crate uint;
 
-impl From<&[u8]> for WaPtr {
-    fn from(value: &[u8]) -> Self {
-        Self(value as *const _ as *mut u8 as u32)
-    }
-}
-
-impl From<&[u8; 32]> for WaPtr {
-    fn from(value: &[u8; 32]) -> Self {
-        Self(value as *const _ as *mut u8 as u32)
-    }
+construct_uint! {
+    pub struct U256(4);
 }
 
 #[cfg(not(test))]
@@ -67,37 +70,52 @@ fn panic(_panic: &core::panic::PanicInfo<'_>) -> ! {
 //#[cfg(target_arch = "wasm32")]
 #[allow(static_mut_refs)]
 #[export_name = "execute"]
-pub unsafe fn execute(length: u32) -> WaPtr {
+pub unsafe fn execute(length: u32) -> u32 {
     if let Some(contract) = &mut CONTRACT {
         let mut contract = contract.borrow_mut();
 
-        let call_data = contract
-            .context()
-            .borrow_mut()
-            .get_call_data(length as usize);
+        let call_data = contract.context().call_data(length as usize);
 
-        contract.execute(call_data).unwrap().ptr()
+        match contract.execute(call_data) {
+            Ok(result) => {
+                if DEBUG {
+                    log(&alloc::format!(
+                        "Result of contract: {:?}",
+                        result.clone().into_inner()
+                    ));
+                }
+
+                env::global::exit(0, result.as_wa_ptr(), result.as_wa_size());
+                0
+            }
+            Err(err) => {
+                if DEBUG {
+                    log(&alloc::format!(
+                        "Contract failed with a error: {}",
+                        err.as_str()
+                    ));
+                }
+                1
+            }
+        }
     } else {
-        panic!("Contract is not set")
+        if DEBUG {
+            log("Contract is empty");
+        }
+        1
     }
 }
 
 #[cfg(target_arch = "wasm32")]
 #[export_name = "onDeploy"]
 #[allow(static_mut_refs)]
-pub unsafe fn on_deploy(ptr: WaPtr) {
-    // problematic input!!!
-}
-
-#[cfg(target_arch = "wasm32")]
-#[export_name = "setEnvironment"]
-#[allow(static_mut_refs)]
-pub unsafe fn set_environment(ptr: u32) {
-    use blockchain::Environment;
-
-    let environment = core::ptr::NonNull::new_unchecked(ptr as *mut Environment).as_mut();
+pub unsafe fn on_deploy(length: u32) -> u32 {
     if let Some(contract) = &mut CONTRACT {
         let mut contract = contract.borrow_mut();
-        contract.set_environment(environment);
+
+        let call_data = contract.context().call_data(length as usize);
+        contract.on_deploy(call_data).unwrap()
+    } else {
+        1
     }
 }

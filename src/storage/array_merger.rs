@@ -1,15 +1,13 @@
-use core::cell::RefCell;
-
 use alloc::vec::Vec;
 
-use crate::{math::abi::encode_pointer, storage::StorageKey, Context};
+use crate::{math::abi::encode_pointer, storage::StorageKey, AsBytes, Context};
 
 use super::StorageValue;
 use alloc::rc::Rc;
 
 #[derive(Clone)]
 pub struct ArrayMerger {
-    context: Rc<RefCell<dyn Context>>,
+    context: Rc<dyn Context>,
     parent_key: Vec<u8>,
     pointer: u16,
     default_value: StorageValue,
@@ -17,7 +15,7 @@ pub struct ArrayMerger {
 
 impl ArrayMerger {
     pub fn new(
-        context: Rc<RefCell<dyn Context>>,
+        context: Rc<dyn Context>,
         parent_key: Vec<u8>,
         pointer: u16,
         default_value: StorageValue,
@@ -29,26 +27,40 @@ impl ArrayMerger {
             default_value,
         }
     }
-    pub fn get<'a>(&mut self, key: &[u8]) -> StorageValue {
+    pub fn get<T>(&mut self, key: &T) -> StorageValue
+    where
+        T: AsBytes,
+    {
         let pointer = self.get_key_hash(key);
-        self.context
-            .borrow_mut()
-            .load(&pointer)
-            .unwrap_or(self.default_value)
+        self.context.load(&pointer).unwrap_or(self.default_value)
     }
 
-    pub fn set<'a>(&mut self, key: &[u8], value: StorageValue) {
+    pub fn set<T>(&mut self, key: &T, value: StorageValue)
+    where
+        T: AsBytes,
+    {
         let pointer = self.get_key_hash(key);
-        self.context.borrow_mut().store(pointer, value);
+        self.context.store(pointer, value);
     }
 
-    pub fn contains_key<'a>(&self, key: &[u8]) -> bool {
+    pub fn contains_key<T>(&self, key: &T) -> bool
+    where
+        T: AsBytes,
+    {
         let key = self.get_key_hash(key);
-        self.context.borrow_mut().exists(&key)
+        self.context.exists(&key)
     }
 
-    fn get_key_hash(&self, key: &[u8]) -> StorageKey {
-        let merged: Vec<u8> = self.parent_key.iter().chain(key.iter()).cloned().collect();
+    fn get_key_hash<T>(&self, key: &T) -> StorageKey
+    where
+        T: AsBytes,
+    {
+        let merged: Vec<u8> = self
+            .parent_key
+            .iter()
+            .chain(key.as_bytes().iter())
+            .cloned()
+            .collect();
         encode_pointer(self.pointer, &merged)
     }
 }
@@ -64,3 +76,29 @@ impl PartialEq for ArrayMerger {
 }
 
 impl Eq for ArrayMerger {}
+
+#[cfg(test)]
+mod tests {
+    use crate::{storage::StorageValue, AsBytes};
+
+    use super::ArrayMerger;
+
+    #[test]
+    pub fn test1() {
+        let context = alloc::rc::Rc::new(crate::env::TestContext::default());
+        let address1 = crate::tests::random_address();
+        let address2 = crate::tests::random_address();
+        let mut am1 = ArrayMerger::new(context.clone(), address1.0.to_vec(), 0, StorageValue::ZERO);
+
+        let check_value = [1; 32];
+
+        let value = am1.get(&address2);
+        assert_eq!(value.as_bytes(), StorageValue::ZERO.as_bytes());
+
+        am1.set(&address2.as_bytes(), StorageValue::new(check_value));
+
+        let mut am2 = ArrayMerger::new(context.clone(), address1.0.to_vec(), 0, StorageValue::ZERO);
+        let value = am2.get(&address2);
+        assert_eq!(value.as_bytes(), &check_value);
+    }
+}

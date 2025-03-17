@@ -1,69 +1,74 @@
-use super::AddressHash;
+use crate::AsWaPtr;
+use crate::{AddressHash, BlockHash, TransactionHash};
 
-#[derive(Clone)]
+#[derive(Clone, Copy)]
 pub struct Environment {
-    pub sender: super::AddressHash,
-    pub origin: super::AddressHash,
-    pub transaction_hash: super::TransactionHash,
-    pub block_hash: super::BlockHash,
-    pub deployer: super::AddressHash,
-    pub address: super::AddressHash,
-    pub timestamp: u64,
-    pub safe_rnd: u64,
+    pub block_hash: BlockHash,
+    pub block_number: u64,
+    pub block_median_time: u64,
+    pub transaction_hash: TransactionHash,
+
+    pub contract_address: AddressHash,
+    pub contract_deployer: AddressHash,
+    pub caller: AddressHash,
+    pub origin: AddressHash,
 }
 
 impl Environment {
-    #[allow(clippy::too_many_arguments)]
-    pub fn new(
-        sender: AddressHash,
-        origin: AddressHash,
-        transaction_hash: super::TransactionHash,
-        block_hash: super::BlockHash,
-        deployer: AddressHash,
-        address: AddressHash,
-        timestamp: u64,
-        safe_rnd: u64,
-    ) -> Self {
-        Self {
-            sender,
-            origin,
-            transaction_hash,
-            block_hash,
-            deployer,
-            address,
-            timestamp,
-            safe_rnd,
-        }
+    pub fn is_self(&self, address: &AddressHash) -> bool {
+        address.eq(&self.contract_address)
     }
 
-    pub fn leak(self) -> Option<&'static Environment> {
-        let leak: &'static Environment = alloc::boxed::Box::leak(alloc::boxed::Box::new(self));
-        Some(leak)
+    pub fn only_deployer(&self, caller: &AddressHash) -> Result<(), crate::error::Error> {
+        if self.contract_deployer.ne(caller) {
+            Err(crate::error::Error::Revert("Only owner"))
+        } else {
+            Ok(())
+        }
+    }
+}
+
+impl AsWaPtr for Environment {
+    fn as_wa_ptr(&self) -> u32 {
+        self as *const Environment as u32
     }
 }
 
 #[allow(dead_code)]
 #[cfg(not(target_arch = "wasm32"))]
 mod display {
-    use crate::utils::{to_hex, ToHex};
+    use crate::utils::ToHex;
     use core::fmt::Display;
 
     impl Display for super::Environment {
         fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-            use alloc::string::ToString;
-
             f.debug_struct("Environment")
-                .field("sender", &self.sender.to_hex())
+                .field("block_hash", &self.block_hash.to_hex())
+                .field("block_number", &self.block_number)
+                .field("block_median_time", &self.block_median_time)
+                .field("transaction_hash", &self.transaction_hash.to_hex())
+                .field("contract_address", &self.contract_address.to_hex())
+                .field("contract_deployer", &self.contract_deployer.to_hex())
+                .field("caller", &self.caller.to_hex())
                 .field("origin", &self.origin.to_hex())
-                .field("transaction", &to_hex(&self.transaction_hash.bytes))
-                .field("block_hash", &to_hex(&self.block_hash.bytes))
-                .field("deployer", &self.deployer.to_hex())
-                .field("address", &self.address.to_hex())
-                .field("timestamp", &self.timestamp.to_string())
-                .field("safe_rnd", &self.safe_rnd.to_string())
                 .finish()
         }
     }
 }
 
-impl Environment {}
+#[allow(dead_code)]
+#[cfg(not(target_arch = "wasm32"))]
+impl Default for Environment {
+    fn default() -> Self {
+        Environment {
+            block_hash: crate::tests::random_block(),
+            block_number: crate::tests::random_u64(),
+            block_median_time: crate::tests::random_u64(),
+            transaction_hash: crate::tests::random_transaction(),
+            contract_address: crate::tests::random_address(),
+            contract_deployer: crate::tests::random_address(),
+            caller: crate::tests::random_address(),
+            origin: crate::tests::random_address(),
+        }
+    }
+}

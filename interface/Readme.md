@@ -1,0 +1,1 @@
+Contract for testing interface

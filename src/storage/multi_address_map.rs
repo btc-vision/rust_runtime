@@ -1,23 +1,15 @@
+use crate::{AddressHash, ArrayMerger, AsBytes, Context, Map, StorageValue};
 use alloc::rc::Rc;
-use core::cell::RefCell;
-
-use crate::{blockchain::AddressHash, Context};
-
-use super::{array_merger::ArrayMerger, map::Map, StorageValue};
 
 pub struct MultiAddressMemoryMap {
-    context: Rc<RefCell<dyn Context>>,
+    context: Rc<dyn Context>,
     pointer: u16,
     default_value: StorageValue,
     pub map: Map<AddressHash, ArrayMerger>,
 }
 
 impl MultiAddressMemoryMap {
-    pub const fn new(
-        context: Rc<RefCell<dyn Context>>,
-        pointer: u16,
-        default_value: StorageValue,
-    ) -> Self {
+    pub const fn new(context: Rc<dyn Context>, pointer: u16, default_value: StorageValue) -> Self {
         Self {
             context,
             pointer,
@@ -30,9 +22,9 @@ impl MultiAddressMemoryMap {
         self.map.clear();
     }
 
-    pub fn get(&mut self, key: &AddressHash) -> ArrayMerger {
-        self.create_key_merger(key);
-        self.map.get(key).unwrap().clone()
+    pub fn get(&mut self, address: &AddressHash) -> ArrayMerger {
+        self.create_key_merger(address);
+        self.map.get(address).unwrap().clone()
     }
 
     pub fn set(&mut self, key: AddressHash, value: ArrayMerger) {
@@ -50,11 +42,39 @@ impl MultiAddressMemoryMap {
                 *key,
                 ArrayMerger::new(
                     self.context.clone(),
-                    key.bytes.to_vec(),
+                    key.as_bytes().to_vec(),
                     self.pointer,
                     self.default_value,
                 ),
             );
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::MultiAddressMemoryMap;
+    use crate::{env::TestContext, storage::StorageValue, tests::random_address, AsBytes};
+    use alloc::rc::Rc;
+
+    #[test]
+    fn test1() {
+        let context = Rc::new(TestContext::default());
+        let address1 = random_address();
+        let address2 = random_address();
+        let one = [1; 32];
+        let mut mamm1 = MultiAddressMemoryMap::new(context.clone(), 0, StorageValue::ZERO);
+        let mut merger1 = mamm1.get(&address1);
+        assert_eq!(
+            merger1.get(&address2).as_bytes(),
+            StorageValue::ZERO.as_bytes()
+        );
+
+        merger1.set(&address2, StorageValue::new(one));
+        assert_eq!(merger1.get(&address2).as_bytes(), &one);
+
+        let mut mamm2 = MultiAddressMemoryMap::new(context.clone(), 0, StorageValue::ZERO);
+        let mut merger2 = mamm2.get(&address1);
+        assert_eq!(merger2.get(&address2).as_bytes(), &one);
     }
 }

@@ -1,9 +1,9 @@
-use ethnum::u256;
+use crate::U256;
 
 use crate::{
-    blockchain::AddressHash,
-    constant::ADDRESS_BYTE_LENGTH,
+    constant::{ADDRESS_BYTE_LENGTH, BOOLEAN_BYTE_LENGTH, U256_BYTE_LENGTH},
     cursor::Cursor,
+    error::Error,
     math::abi::encode_selector_const,
     storage::{
         multi_address_map::MultiAddressMemoryMap,
@@ -11,6 +11,7 @@ use crate::{
         stored_map::StoredMap,
     },
     types::{CallData, Selector},
+    AddressHash,
 };
 
 pub struct OP20Params {
@@ -22,10 +23,10 @@ pub struct OP20Params {
 
 #[repr(u16)]
 pub enum Pointer {
-    MaxSupply = 1,
+    NonceMap = 1,
+    MaxSupply,
     Decimals,
-    Name,
-    Symbol,
+    String,
     TotalSupply,
     AllowanceMap,
     BalanceOfMap,
@@ -38,28 +39,38 @@ impl Pointer {
 }
 
 pub const SELECTOR_OWNER: Selector = encode_selector_const("owner");
+pub const SELECTOR_DEPLOYER: Selector = encode_selector_const("deployer");
 pub const SELECTOR_DECIMALS: Selector = encode_selector_const("decimals");
 pub const SELECTOR_NAME: Selector = encode_selector_const("name");
 pub const SELECTOR_SYMBOL: Selector = encode_selector_const("symbol");
 pub const SELECTOR_TOTAL_SUPPLY: Selector = encode_selector_const("totalSupply");
 pub const SELECTOR_MAXIMUM_SUPPLY: Selector = encode_selector_const("maximumSupply");
 pub const SELECTOR_ALLOWANCE: Selector = encode_selector_const("allowance");
-pub const SELECTOR_APPROVE: Selector = encode_selector_const("approve");
-pub const SELECTOR_BALANCE_OF: Selector = encode_selector_const("balanceOf");
-pub const SELECTOR_BURN: Selector = encode_selector_const("burn");
-pub const SELECTOR_TRANSFER: Selector = encode_selector_const("transfer");
-pub const SELECTOR_TRANSFER_FROM: Selector = encode_selector_const("transferFrom");
+pub const SELECTOR_APPROVE: Selector = encode_selector_const("approve(address,uint256)");
+pub const SELECTOR_APPROVE_FROM: Selector =
+    encode_selector_const("approveFrom(address,uint256,uint256,bytes)");
+pub const SELECTOR_BALANCE_OF: Selector = encode_selector_const("balanceOf(address)");
+pub const SELECTOR_BURN: Selector = encode_selector_const("burn(uint256)");
+pub const SELECTOR_TRANSFER: Selector = encode_selector_const("transfer(address,uint256)");
+pub const SELECTOR_TRANSFER_FROM: Selector =
+    encode_selector_const("transferFrom(address,address,uint256)");
+pub const SELECTOR_NONCE_OF: Selector = encode_selector_const("nonceOf(address)");
 
 pub trait OP20Trait: super::ContractTrait {
     fn execute_base(
         &mut self,
         selector: Selector,
-        call_data: CallData,
+        mut call_data: CallData,
     ) -> Result<Cursor, crate::error::Error> {
         match selector {
+            SELECTOR_DEPLOYER => {
+                let mut cursor = Cursor::new(ADDRESS_BYTE_LENGTH);
+                cursor.write_address(&self.environment().contract_deployer)?;
+                Ok(cursor)
+            }
             SELECTOR_OWNER => {
                 let mut cursor = Cursor::new(ADDRESS_BYTE_LENGTH);
-                cursor.write_address(&self.environment().deployer)?;
+                cursor.write_address(&self.environment().contract_deployer)?;
                 Ok(cursor)
             }
             SELECTOR_DECIMALS => {
@@ -82,20 +93,66 @@ pub trait OP20Trait: super::ContractTrait {
             }
             SELECTOR_TOTAL_SUPPLY => {
                 let mut cursor = Cursor::new(32);
-                cursor.write_u256_be(&self.total_supply().value())?;
+                cursor.write_u256(&self.total_supply().value(), true)?;
                 Ok(cursor)
             }
             SELECTOR_MAXIMUM_SUPPLY => {
                 let mut cursor = Cursor::new(32);
-                cursor.write_u256_be(&self.max_supply())?;
+                cursor.write_u256(&self.max_supply(), true)?;
                 Ok(cursor)
             }
-            SELECTOR_ALLOWANCE => self.allowance(call_data),
-            SELECTOR_APPROVE => self.approve(call_data),
-            SELECTOR_BALANCE_OF => self.balance_of(call_data),
-            SELECTOR_BURN => self.burn(call_data),
-            SELECTOR_TRANSFER => self.transfer(call_data),
-            SELECTOR_TRANSFER_FROM => self.transfer_from(call_data),
+            SELECTOR_ALLOWANCE => {
+                let address_owner = call_data.read_address()?;
+                let address_spender = call_data.read_address()?;
+
+                self.allowance(&address_owner, &address_spender)
+            }
+            SELECTOR_APPROVE => {
+                let owner = self.environment().caller;
+                let spender = call_data.read_address()?;
+                let value = call_data.read_u256(true)?;
+
+                self.approve(owner, spender, value)
+            }
+            SELECTOR_APPROVE_FROM => {
+                let owner = self.environment().origin;
+                let spender = call_data.read_address()?;
+                let value = call_data.read_u256(true)?;
+                let nonce = call_data.read_u256(true)?;
+                let signature = call_data.read_bytes_with_length(true)?;
+
+                self.approve_from(owner, spender, value, nonce, signature)
+            }
+            SELECTOR_NONCE_OF => {
+                let owner = call_data.read_address()?;
+                self.nonce_of(owner)
+            }
+            SELECTOR_BALANCE_OF => {
+                let address = call_data.read_address()?;
+
+                self.balance_of(address)
+            }
+
+            SELECTOR_BURN => {
+                let amount = call_data.read_u256(true)?;
+
+                self.burn(amount)
+            }
+
+            SELECTOR_TRANSFER => {
+                let address = call_data.read_address()?;
+                let amount = call_data.read_u256(true)?;
+                self.transfer(address, amount)
+            }
+
+            SELECTOR_TRANSFER_FROM => {
+                let address_from = call_data.read_address()?;
+                let address_to = call_data.read_address()?;
+                let amount = call_data.read_u256(true)?;
+
+                self.transfer_from(address_from, address_to, amount)
+            }
+
             _ => Err(crate::error::Error::UnknownSelector),
         }
     }
@@ -110,7 +167,7 @@ pub trait OP20Trait: super::ContractTrait {
     fn params(&mut self) -> &mut OP20Params;
     fn total_supply(&mut self) -> &mut StoredU256;
 
-    fn max_supply(&mut self) -> u256 {
+    fn max_supply(&mut self) -> U256 {
         self.params().max_supply.value()
     }
     fn decimals(&mut self) -> u8 {
@@ -125,31 +182,74 @@ pub trait OP20Trait: super::ContractTrait {
     }
 
     fn allowance_map(&mut self) -> &mut MultiAddressMemoryMap;
-    fn balance_of_map(&mut self) -> &mut StoredMap<AddressHash, u256>;
+    fn balance_of_map(&mut self) -> &mut StoredMap<AddressHash, U256>;
+    fn nonce_map(&mut self) -> &mut StoredMap<AddressHash, U256>;
 
-    fn allowance_base(&mut self, owner: &AddressHash, spender: &AddressHash) -> u256 {
+    #[inline]
+    fn allowance_base(&mut self, owner: &AddressHash, spender: &AddressHash) -> U256 {
         let mut sender_map = self.allowance_map().get(owner);
-        sender_map.get(&spender.bytes).u256()
+        sender_map.get(&spender).u256()
     }
 
+    #[inline]
     fn allowance(
-        &mut self,
-        mut call_data: CallData,
-    ) -> Result<crate::cursor::Cursor, crate::error::Error> {
-        let mut cursor = Cursor::new(32);
-        let address_owner = call_data.read_address()?;
-        let address_spender = call_data.read_address()?;
-        let allowance = self.allowance_base(&address_owner, &address_spender);
-
-        cursor.write_u256_be(&allowance)?;
-        Ok(cursor)
-    }
-
-    fn approve_base(
         &mut self,
         owner: &AddressHash,
         spender: &AddressHash,
-        value: u256,
+    ) -> Result<crate::cursor::Cursor, crate::error::Error> {
+        let mut cursor = Cursor::new(32);
+        let allowance = self.allowance_base(&owner, &spender);
+        cursor.write_u256(&allowance, true)?;
+        Ok(cursor)
+    }
+
+    #[inline]
+    fn approve_base(
+        &mut self,
+        owner: AddressHash,
+        spender: AddressHash,
+        amount: U256,
+    ) -> Result<bool, crate::error::Error> {
+        if AddressHash::DEAD.eq(&owner) {
+            return Err(crate::error::Error::Revert(
+                "Address con not be dead address",
+            ));
+        }
+
+        if AddressHash::DEAD.eq(&spender) {
+            return Err(crate::error::Error::Revert(
+                "Address con not be dead address",
+            ));
+        }
+
+        self.allowance_map()
+            .get(&owner)
+            .set(&spender, amount.into());
+
+        self.create_approve_event(owner, spender, amount)?;
+        Ok(true)
+    }
+
+    #[inline]
+    fn approve(
+        &mut self,
+        owner: AddressHash,
+        spender: AddressHash,
+        amount: U256,
+    ) -> Result<Cursor, crate::error::Error> {
+        let mut cursor = Cursor::new(BOOLEAN_BYTE_LENGTH);
+        cursor.write_bool(self.approve_base(owner, spender, amount)?)?;
+        Ok(cursor)
+    }
+
+    #[inline]
+    fn approve_from_base(
+        &mut self,
+        owner: &AddressHash,
+        spender: &AddressHash,
+        value: &U256,
+        nonce: &U256,
+        signature: &[u8],
     ) -> Result<bool, crate::error::Error> {
         if AddressHash::DEAD.eq(owner) {
             return Err(crate::error::Error::DeadAddress);
@@ -159,69 +259,115 @@ pub trait OP20Trait: super::ContractTrait {
             return Err(crate::error::Error::DeadAddress);
         }
 
-        let mut sender_map = self.allowance_map().get(owner);
-        sender_map.set(&spender.bytes, value.into());
+        let stored_nonce = self.nonce_map().get(owner);
+        if stored_nonce.eq(nonce) {
+            return Err(crate::error::Error::Revert(
+                "Invalid nonce (possible replay or out-of-sync)",
+            ));
+        }
 
-        self.create_approve_event(*owner, *spender, value)?;
+        let mut data = Cursor::new(ADDRESS_BYTE_LENGTH * 2 + 2 * U256_BYTE_LENGTH);
+        data.write_address(owner)?;
+        data.write_address(spender)?;
+        data.write_u256(&value, true)?;
+        data.write_u256(&nonce, true)?;
+
+        let hash = self.context().sha256(data.into_inner());
+        if !self
+            .context()
+            .verify_schnorr_signature(owner, signature, &hash)?
+        {
+            return Err(crate::error::Error::Revert(
+                "ApproveFrom: Invalid signature",
+            ));
+        }
+
+        let mut sender_map = self.allowance_map().get(owner);
+        sender_map.set(&spender, (*value).into());
+
+        self.create_approve_event(*owner, *spender, *value)?;
 
         Ok(true)
     }
 
-    fn approve(
+    #[inline]
+    fn approve_from(
         &mut self,
-        mut call_data: CallData,
-    ) -> Result<crate::cursor::Cursor, crate::error::Error> {
-        let owner = self.environment().sender;
-        let spender = call_data.read_address()?;
-        let amount = call_data.read_u256_be()?;
+        owner: AddressHash,
+        spender: AddressHash,
+        value: U256,
+        nonce: U256,
+        signature: &[u8],
+    ) -> Result<Cursor, Error> {
+        if owner == spender {
+            return Err(Error::Revert(
+                "Direct owner approval detected. Use approve function instead of approveFrom.",
+            ));
+        }
 
-        let mut cursor = Cursor::new(32);
-        cursor.write_bool(self.approve_base(&owner, &spender, amount)?)?;
+        if signature.len() != 64 {
+            return Err(Error::Revert("Invalid signature length"));
+        }
 
-        Ok(cursor)
+        let mut response = Cursor::new(BOOLEAN_BYTE_LENGTH);
+        response
+            .write_bool(self.approve_from_base(&owner, &spender, &value, &nonce, signature)?)?;
+        Ok(response)
     }
 
-    fn balance_of_base(&mut self, address: &AddressHash) -> u256 {
+    #[inline]
+    fn nonce_of(&mut self, owner: AddressHash) -> Result<Cursor, Error> {
+        let nonce = self.nonce_map().get(&owner);
+        let mut response = Cursor::new(U256_BYTE_LENGTH);
+        response.write_u256(&nonce, true)?;
+        Ok(response)
+    }
+
+    #[inline]
+    fn balance_of_base(&mut self, address: &AddressHash) -> U256 {
         self.balance_of_map().get(address)
     }
 
+    #[inline]
     fn balance_of(
         &mut self,
-        mut call_data: crate::types::CallData,
+        address: AddressHash,
     ) -> Result<crate::cursor::Cursor, crate::error::Error> {
-        let mut cursor = Cursor::new(32);
-        let address = call_data.read_address()?;
+        let mut result = Cursor::new(U256_BYTE_LENGTH);
+
         let balance = self.balance_of_base(&address);
-        cursor.write_u256_be(&balance)?;
-        Ok(cursor)
+
+        result.write_u256(&balance, true)?;
+        Ok(result)
     }
 
-    fn burn_base(&mut self, value: u256, only_deployer: bool) -> Result<bool, crate::error::Error> {
-        if value.eq(&u256::ZERO) {
-            return Err(crate::error::Error::NoTokens);
+    #[inline]
+    fn burn_base(&mut self, value: U256, only_deployer: bool) -> Result<bool, crate::error::Error> {
+        let environment = self.environment();
+        if value.eq(&U256::zero()) {
+            return Err(crate::error::Error::Revert("No tokens"));
         }
 
         if only_deployer {
-            self.only_deployer(&self.environment().sender)?;
+            environment.only_deployer(&environment.caller)?;
         }
 
         let total_supply = self.total_supply().value();
         if total_supply < value {
-            return Err(crate::error::Error::InsufficientTotalSupply);
+            return Err(Error::Revert("Insufficient total supply."));
         }
 
-        let sender = self.environment().sender;
-        if !self.balance_of_map().contains_key(&sender) {
-            return Err(crate::error::Error::NoBalance);
+        if !self.balance_of_map().contains_key(&environment.caller) {
+            return Err(crate::error::Error::Revert("No balance"));
         }
 
-        let balance: u256 = self.balance_of_map().get(&sender);
+        let balance: U256 = self.balance_of_map().get(&environment.caller);
         if balance < value {
-            return Err(crate::error::Error::InsufficientBalance);
+            return Err(Error::Revert("Insufficient balance"));
         }
 
         let new_balance = balance - value;
-        self.balance_of_map().set(&sender, new_balance);
+        self.balance_of_map().set(&environment.caller, new_balance);
         let value = self.total_supply().set(total_supply - value);
 
         self.create_burn_event(value)?;
@@ -229,25 +375,24 @@ pub trait OP20Trait: super::ContractTrait {
         Ok(true)
     }
 
-    fn burn(
-        &mut self,
-        mut call_data: crate::types::CallData,
-    ) -> Result<crate::cursor::Cursor, crate::error::Error> {
-        let mut cursor = Cursor::new(1);
-        let amount = call_data.read_u256_be()?;
+    #[inline]
+    fn burn(&mut self, amount: U256) -> Result<crate::cursor::Cursor, Error> {
+        let mut response = Cursor::new(1);
 
-        cursor.write_bool(self.burn_base(amount, true)?)?;
-        Ok(cursor)
+        response.write_bool(self.burn_base(amount, true)?)?;
+        Ok(response)
     }
 
+    #[inline]
     fn mint_base(
         &mut self,
         to: &AddressHash,
-        value: u256,
+        value: U256,
         only_deployer: bool,
-    ) -> Result<bool, crate::error::Error> {
+    ) -> Result<bool, Error> {
+        let environment = self.environment();
         if only_deployer {
-            self.only_deployer(&self.environment().sender)?;
+            environment.only_deployer(&environment.caller)?;
         }
 
         if !self.balance_of_map().contains_key(to) {
@@ -261,86 +406,86 @@ pub trait OP20Trait: super::ContractTrait {
         let new = old + value;
 
         if new > self.max_supply() {
-            return Err(crate::error::Error::MaxSupplyReached);
+            return Err(Error::Revert("Max supply reached"));
         }
         self.total_supply().set(new);
-
         self.create_mint_event(*to, value)?;
-
         Ok(true)
     }
 
+    #[inline]
     fn transfer_base(
         &mut self,
         to: &AddressHash,
-        value: u256,
+        value: &U256,
     ) -> Result<bool, crate::error::Error> {
-        let sender = self.environment().sender;
-        if self.is_self(&sender) {
-            return Err(crate::error::Error::CanNotTransferFromSelfAccount);
+        let environment = self.environment();
+        if environment.is_self(&environment.caller) {
+            return Err(Error::Revert("Can not transfer from self account"));
         }
 
-        if value == u256::ZERO {
-            return Err(crate::error::Error::CannotTransferZeroTokens);
+        if value.eq(&U256::zero()) {
+            return Err(Error::Revert("Cannot transfer 0 tokens"));
         }
 
-        let balance = self.balance_of_map().get(&sender);
+        let balance = self.balance_of_map().get(&environment.caller);
 
-        if balance < value {
-            return Err(crate::error::Error::InsufficientBalance);
+        if balance.lt(value) {
+            return Err(Error::Revert("Insufficient balance"));
         }
         let new_balance = balance - value;
-        self.balance_of_map().set(&sender, new_balance);
+        self.balance_of_map().set(&environment.caller, new_balance);
 
         let balance = self.balance_of_map().get(to);
         let new_balance = balance + value;
         self.balance_of_map().set(to, new_balance);
 
-        self.create_transfer_event(sender, *to, value)?;
+        self.create_transfer_event(environment.caller, *to, *value)?;
         Ok(true)
     }
 
+    #[inline]
     fn transfer(
         &mut self,
-        mut call_data: crate::types::CallData,
+        address: AddressHash,
+        amount: U256,
     ) -> Result<crate::cursor::Cursor, crate::error::Error> {
-        let mut cursor = Cursor::new(1);
-        let address = call_data.read_address()?;
-        let amount = call_data.read_u256_be()?;
-        let result = self.transfer_base(&address, amount)?;
+        let mut result = Cursor::new(1);
 
-        cursor.write_bool(result)?;
-        Ok(cursor)
+        result.write_bool(self.transfer_base(&address, &amount)?)?;
+        Ok(result)
     }
 
+    #[inline]
     fn spend_allowance(
         &mut self,
-        deployer: &AddressHash,
+        owner: &AddressHash,
         spender: &AddressHash,
-        value: u256,
+        value: U256,
     ) -> Result<(), crate::error::Error> {
-        let mut deployer_allowance_map = self.allowance_map().get(deployer);
-        let allowed: u256 = deployer_allowance_map.get(&spender.bytes).u256();
+        let mut owner_allowance_map = self.allowance_map().get(owner);
+        let allowed: U256 = owner_allowance_map.get(&spender).u256();
 
         if allowed < value {
-            return Err(crate::error::Error::InsufficientAllowance);
+            return Err(crate::error::Error::Revert("Insufficient allowance"));
         }
 
         let new_allowance = allowed - value;
-        deployer_allowance_map.set(&spender.bytes, new_allowance.into());
-        self.allowance_map().set(*deployer, deployer_allowance_map);
+        owner_allowance_map.set(&spender, new_allowance.into());
+        self.allowance_map().set(*owner, owner_allowance_map);
         Ok(())
     }
 
+    #[inline]
     fn transfer_from_unsafe(
         &mut self,
         from: &AddressHash,
         to: &AddressHash,
-        value: u256,
+        value: U256,
     ) -> Result<bool, crate::error::Error> {
-        let balance: u256 = self.balance_of_map().get(from);
+        let balance: U256 = self.balance_of_map().get(from);
         if balance < value {
-            return Err(crate::error::Error::InsufficientBalance);
+            return Err(crate::error::Error::Revert("Insufficient balance"));
         }
 
         let new_balance = balance - value;
@@ -349,7 +494,7 @@ pub trait OP20Trait: super::ContractTrait {
         if !self.balance_of_map().contains_key(to) {
             self.balance_of_map().set(to, value);
         } else {
-            let to_balance: u256 = self.balance_of_map().get(to);
+            let to_balance: U256 = self.balance_of_map().get(to);
             let new_to_balance = to_balance + value;
             self.balance_of_map().set(to, new_to_balance);
         }
@@ -359,39 +504,40 @@ pub trait OP20Trait: super::ContractTrait {
         Ok(true)
     }
 
+    #[inline]
     fn transfer_from_base(
         &mut self,
         from: &AddressHash,
         to: &AddressHash,
-        value: u256,
+        value: U256,
     ) -> Result<bool, crate::error::Error> {
         if AddressHash::DEAD.eq(from) || AddressHash::DEAD.eq(to) {
             return Err(crate::error::Error::DeadAddress);
         }
 
-        self.spend_allowance(from, &self.environment().sender, value)?;
+        let sender = self.environment().caller;
+
+        self.spend_allowance(from, &sender, value)?;
         self.transfer_from_unsafe(from, to, value)?;
         Ok(true)
     }
 
+    #[inline]
     fn transfer_from(
         &mut self,
-        mut call_data: crate::types::CallData,
+        address_from: AddressHash,
+        address_to: AddressHash,
+        amount: U256,
     ) -> Result<crate::cursor::Cursor, crate::error::Error> {
-        let mut cursor = Cursor::new(1);
-
-        let address_from = call_data.read_address()?;
-        let address_to = call_data.read_address()?;
-        let amount = call_data.read_u256_be()?;
-        cursor.write_bool(self.transfer_from_base(&address_from, &address_to, amount)?)?;
-
-        Ok(cursor)
+        let mut result = Cursor::new(BOOLEAN_BYTE_LENGTH);
+        result.write_bool(self.transfer_from_base(&address_from, &address_to, amount)?)?;
+        Ok(result)
     }
 
-    fn create_burn_event(&mut self, value: u256) -> Result<(), crate::error::Error> {
+    #[inline]
+    fn create_burn_event(&mut self, value: U256) -> Result<(), crate::error::Error> {
         let burn_event = crate::event::Event::burn(value)?;
-
-        self.context().borrow_mut().emit(&burn_event);
+        self.emit(&burn_event);
         Ok(())
     }
 
@@ -399,20 +545,20 @@ pub trait OP20Trait: super::ContractTrait {
         &self,
         deployer: AddressHash,
         spender: AddressHash,
-        value: u256,
+        value: U256,
     ) -> Result<(), crate::error::Error> {
         let approve_event = crate::event::Event::approve(deployer, spender, value)?;
-        self.context().borrow_mut().emit(&approve_event);
+        self.emit(&approve_event);
         Ok(())
     }
 
     fn create_mint_event(
         &mut self,
         deployer: AddressHash,
-        amount: u256,
+        amount: U256,
     ) -> Result<(), crate::error::Error> {
         let mint_event = crate::event::Event::mint(deployer, amount)?;
-        self.context().borrow_mut().emit(&mint_event);
+        self.emit(&mint_event);
         Ok(())
     }
 
@@ -420,10 +566,10 @@ pub trait OP20Trait: super::ContractTrait {
         &mut self,
         from: AddressHash,
         to: AddressHash,
-        amount: u256,
+        amount: U256,
     ) -> Result<(), crate::error::Error> {
         let transfer_event = crate::event::Event::transfer(from, to, amount)?;
-        self.context().borrow_mut().emit(&transfer_event);
+        self.emit(&transfer_event);
         Ok(())
     }
 }

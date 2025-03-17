@@ -1,9 +1,8 @@
-use ethnum::u256;
+use crate::U256;
 
-use super::{StorageKey, StorageValue};
-use crate::{blockchain::AddressHash, math::abi::encode_pointer, Context};
+use crate::{math::abi::encode_pointer, AddressHash, Context, StorageKey, StorageValue};
 use alloc::rc::Rc;
-use core::{cell::RefCell, convert::Into};
+use core::convert::Into;
 
 pub trait StoredTrait<T, D>
 where
@@ -22,7 +21,7 @@ where
     StorageValue: Into<T>,
     D: Into<T> + Clone,
 {
-    context: Rc<RefCell<dyn Context>>,
+    context: Rc<dyn Context>,
     pointer: StorageKey,
     default_value: D,
     value: Option<T>,
@@ -40,7 +39,6 @@ where
         } else {
             let value: T = self
                 .context
-                .borrow_mut()
                 .load(&self.pointer)
                 .map(|value| value.into())
                 .unwrap_or(self.default_value.clone().into());
@@ -52,7 +50,7 @@ where
 
     fn set(&mut self, value: T) -> T {
         if Some(value) != self.value {
-            self.context.borrow_mut().store(self.pointer, value.into());
+            self.context.store(self.pointer, value.into());
             self.value = Some(value);
             value
         } else {
@@ -63,7 +61,6 @@ where
     fn refresh(&mut self) -> T {
         let value: T = self
             .context
-            .borrow_mut()
             .load(&self.pointer)
             .map(|value| value.into())
             .unwrap_or(self.default_value.clone().into());
@@ -78,7 +75,7 @@ where
 
     fn commit(&mut self) {
         if let Some(value) = self.value {
-            self.context.borrow_mut().store(self.pointer, value.into());
+            self.context.store(self.pointer, value.into());
         }
     }
 }
@@ -89,11 +86,7 @@ where
     StorageValue: Into<T>,
     D: Into<T> + Clone,
 {
-    pub const fn new_const(
-        context: Rc<RefCell<dyn Context>>,
-        pointer: u16,
-        default_value: D,
-    ) -> Self {
+    pub const fn new_const(context: Rc<dyn Context>, pointer: u16, default_value: D) -> Self {
         Self {
             context,
             pointer: crate::math::abi::encode_pointer_const(pointer),
@@ -103,14 +96,14 @@ where
     }
 
     pub fn new(
-        context: Rc<RefCell<dyn Context>>,
+        context: Rc<dyn Context>,
         pointer: u16,
         sub_pointer: &StorageKey,
         default_value: D,
     ) -> Self {
         Self {
             context,
-            pointer: encode_pointer(pointer, &sub_pointer.bytes),
+            pointer: encode_pointer(pointer, &sub_pointer.0),
             default_value,
             value: None,
         }
@@ -123,33 +116,19 @@ pub type StoredU16 = Stored<u16, u16>;
 pub type StoredU32 = Stored<u32, u32>;
 pub type StoredU64 = Stored<u64, u64>;
 pub type StoredU128 = Stored<u128, u128>;
-pub type StoredU256 = Stored<u256, u256>;
+pub type StoredU256 = Stored<U256, U256>;
 pub type StoredAddress = Stored<AddressHash, AddressHash>;
 
 #[cfg(test)]
 mod tests {
-
-    use core::cell::RefCell;
-
+    use crate::U256;
+    use crate::{env::TestContext, Context};
     use alloc::rc::Rc;
-    use alloc::vec::Vec;
-    use ethnum::u256;
-
-    use crate::cursor::Cursor;
-    use crate::storage::map::Map;
-    use crate::Context;
-    use crate::TestContext;
 
     use super::StoredTrait;
 
-    fn context() -> Rc<RefCell<dyn Context>> {
-        Rc::new(RefCell::new(TestContext::new(
-            crate::env::Network::Testnet,
-            Map::new(),
-            Vec::new(),
-            Vec::new(),
-            None,
-        )))
+    fn context() -> Rc<dyn Context> {
+        Rc::new(TestContext::default())
     }
 
     #[test]
@@ -196,8 +175,8 @@ mod tests {
 
     #[test]
     fn test_u256() {
-        let mut stored_u256 = super::StoredU256::new_const(context(), 0, u256::new(0));
-        stored_u256.set(u256::new(123));
-        assert_eq!(stored_u256.refresh(), u256::new(123))
+        let mut stored_u256 = super::StoredU256::new_const(context(), 0, U256::from(0));
+        stored_u256.set(U256::from(123));
+        assert_eq!(stored_u256.refresh(), U256::from(123))
     }
 }

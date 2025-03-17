@@ -6,18 +6,11 @@ pub enum Error {
     UnknownSelector,
     DuplicateKey,
     DeadAddress,
-    InsufficientTotalSupply,
-    NoBalance,
-    InsufficientBalance,
-    MaxSupplyReached,
-    CanNotTransferFromSelfAccount,
-    CannotTransferZeroTokens,
-    OnlyOwner,
-    NoTokens,
-    InsufficientAllowance,
+    ConvertError,
+    ParseError,
+    NoValidAddress,
 
-    Test,
-
+    Revert(&'static str),
     Extra(&'static str),
 }
 
@@ -29,16 +22,11 @@ impl Error {
             Self::UnknownSelector => "Unknown selector",
             Self::DuplicateKey => "Duplicate key",
             Self::DeadAddress => "Dead address",
-            Self::InsufficientTotalSupply => "InsufficientTotalSupply",
-            Self::NoBalance => "No balance",
-            Self::InsufficientBalance => "Insufficient balance",
-            Self::MaxSupplyReached => "Max supply reached",
-            Self::CanNotTransferFromSelfAccount => "CanNotTransferFromSelfAccount",
-            Self::CannotTransferZeroTokens => "CannotTransferZeroTokens",
-            Self::OnlyOwner => "OnlyOwner",
-            Self::NoTokens => "NoTokens",
-            Self::InsufficientAllowance => "InsufficientAllowance",
-            Self::Test => "Test",
+            Self::ConvertError => "Convert error",
+            Self::ParseError => "ParseError",
+            Self::NoValidAddress => "NoValidAddress",
+
+            Self::Revert(err) => err,
             Self::Extra(err) => err,
         }
     }

@@ -1,23 +1,24 @@
-use alloc::vec::Vec;
-
+#[allow(unused_imports)]
 use crate::{
-    blockchain::{transaction::Input, AddressHash},
     cursor::Cursor,
-    storage::{
-        key::{self, StorageKey},
-        map::Map,
-        value::{self, StorageValue},
-    },
-    WaPtr,
+    storage::{key::StorageKey, map::Map, value::StorageValue},
+    AddressHash, AsWaMutPtr, AsWaPtr, AsWaSize, BlockHash, Environment, FromBytes, Input, Output,
+    TransactionHash,
 };
-use ethnum::u256;
+
+use core::cell::RefCell;
 
 #[link(wasm_import_module = "env")]
 extern "C" {
     pub fn revert(data: u32, length: u32);
 
-    #[link_name = "getCalldata"]
-    pub fn get_call_data(offset: u32, length: u32, result: WaPtr);
+    pub fn exit(status: u32, data: u32, length: u32);
+
+    #[link_name = "calldata"]
+    pub fn get_call_data(offset: u32, length: u32, result: u32);
+
+    #[link_name = "environment"]
+    pub fn get_environment(offset: u32, length: u32, result: u32);
 
     pub fn load(key: u32, result: u32);
 
@@ -32,6 +33,7 @@ extern "C" {
     pub fn call_result(offset: u32, length: u32, result: u32);
 
     pub fn emit(data: u32, data_length: u32);
+
     #[link_name = "encodeAddress"]
     pub fn encode_address(data: u32) -> u32;
 
@@ -58,147 +60,164 @@ extern "C" {
 
 #[link(wasm_import_module = "debug")]
 extern "C" {
-    pub fn log(ptr: u32);
+    pub fn log(ptr: u32, len: u32);
 }
 
-//#[cfg(target_arch = "wasm32")]
 pub struct GlobalContext {
-    store: Map<StorageKey, StorageValue>,
-    inputs: Option<Vec<crate::blockchain::transaction::Input>>,
-    outputs: Option<Vec<crate::blockchain::transaction::Output>>,
+    store: RefCell<Map<StorageKey, StorageValue>>,
 }
 
-//#[cfg(target_arch = "wasm32")]
+unsafe impl Sync for GlobalContext {}
+
 impl GlobalContext {
     pub const fn new() -> Self {
         Self {
-            store: Map::new(),
-            inputs: None,
-            outputs: None,
+            store: RefCell::new(Map::new()),
         }
     }
 }
 
-//#[cfg(target_arch = "wasm32")]
 impl super::Context for GlobalContext {
-    fn get_call_data(&self, size: usize) -> Cursor {
-        let cursor = crate::cursor::Cursor::new(size);
+    fn call_data(&self, size: usize) -> Cursor {
+        let mut cursor = crate::cursor::Cursor::new(size);
         unsafe {
-            get_call_data(0, size as u32, cursor.ptr());
+            get_call_data(0, size as u32, cursor.as_wa_mut_ptr());
         }
         cursor
     }
 
-    fn log(&self, text: &str) {
+    fn environment(&self) -> Environment {
         unsafe {
-            let bytes = text
-                .as_bytes()
-                .iter()
-                .chain(b"\0".iter())
-                .cloned()
-                .collect::<alloc::vec::Vec<u8>>();
-            log(bytes.as_ptr() as u32);
-        }
-    }
+            let mut cursor = Cursor::new(crate::constant::ENVIRONMENT_BYTE_LENGTH);
+            get_environment(
+                0,
+                crate::constant::ENVIRONMENT_BYTE_LENGTH as u32,
+                cursor.as_wa_mut_ptr(),
+            );
 
-    fn emit(&mut self, event: &dyn crate::event::EventTrait) {
-        unsafe {
-            emit(event.ptr(), event.buffer().len() as u32);
-        }
-    }
+            Environment {
+                block_hash: BlockHash::from_bytes(
+                    cursor
+                        .read_bytes(crate::constant::BLOCK_HASH_BYTE_LENGTH)
+                        .unwrap(),
+                ),
+                block_number: cursor.read_u64(true).unwrap(),
+                block_median_time: cursor.read_u64(true).unwrap(),
+                transaction_hash: TransactionHash::from_bytes(
+                    cursor
+                        .read_bytes(crate::constant::TRANSACTION_HASH_BYTE_LENGTH)
+                        .unwrap(),
+                ),
 
-    fn call(&self, address: &crate::blockchain::AddressHash, data: Cursor) -> Cursor {
-        data
-    }
-
-    fn encode_address(&self, _address: &str) -> &'static [u8] {
-        b"abcd"
-    }
-
-    fn deploy_from_address(
-        &self,
-        from_address: &AddressHash,
-        salt: [u8; 32],
-    ) -> Result<AddressHash, crate::error::Error> {
-        Ok(*from_address)
-    }
-
-    fn validate_bitcoin_address(&self, _address: &str) -> bool {
-        false
-    }
-
-    fn verify_schnorr_signature(&self, _data: &[u8]) -> bool {
-        false
-    }
-
-    fn load(&mut self, pointer: &StorageKey) -> Option<StorageValue> {
-        unsafe {
-            let mut value = StorageValue::from_bytes([0; 32]);
-            load(pointer.ptr().0, value.ptr().0);
-
-            if value.eq(&StorageValue::ZERO) {
-                None
-            } else {
-                self.store.insert(*pointer, value.clone());
-                Some(value)
+                contract_address: cursor.read_address().unwrap(),
+                contract_deployer: cursor.read_address().unwrap(),
+                caller: cursor.read_address().unwrap(),
+                origin: cursor.read_address().unwrap(),
             }
         }
     }
 
-    fn exists(&mut self, pointer: &StorageKey) -> bool {
-        if self.store.contains_key(pointer) {
+    fn emit(&self, event: &dyn crate::event::EventTrait) {
+        unsafe {
+            emit(event.as_wa_ptr(), event.as_wa_size());
+        }
+    }
+
+    fn call(&self, _address: &crate::AddressHash, _data: Cursor) -> Cursor {
+        unimplemented!("This method is not implemented")
+    }
+
+    fn encode_address(&self, _address: &str) -> &'static [u8] {
+        unimplemented!("This method is not implemented")
+    }
+
+    fn deploy_from_address(
+        &self,
+        _from_address: &AddressHash,
+        _salt: [u8; 32],
+    ) -> Result<AddressHash, crate::error::Error> {
+        unimplemented!("This method is not implemented")
+    }
+
+    fn validate_bitcoin_address(&self, address: &str) -> Result<bool, crate::error::Error> {
+        unsafe {
+            Ok(validate_bitcoin_address(
+                address.as_bytes().as_ptr() as u32,
+                address.as_bytes().len() as u32,
+            ) != 0)
+        }
+    }
+
+    fn verify_schnorr_signature(
+        &self,
+        address: &AddressHash,
+        signature: &[u8],
+        hash: &[u8],
+    ) -> Result<bool, crate::error::Error> {
+        unsafe {
+            Ok(verify_schnorr_signature(
+                address.as_wa_ptr(),
+                signature.as_ptr() as u32,
+                hash.as_ptr() as u32,
+            ) != 0)
+        }
+    }
+
+    fn load(&self, pointer: &StorageKey) -> Option<StorageValue> {
+        unsafe {
+            let value = StorageValue::ZERO;
+            let result = self.store.borrow().get(pointer).cloned();
+            if let Some(value) = result {
+                Some(value)
+            } else {
+                load(pointer.as_wa_ptr(), value.as_wa_ptr());
+
+                if value.eq(&StorageValue::ZERO) {
+                    None
+                } else {
+                    self.store.borrow_mut().insert(*pointer, value);
+                    Some(value)
+                }
+            }
+        }
+    }
+
+    fn store(&self, pointer: StorageKey, value: StorageValue) {
+        unsafe {
+            if if let Some(old) = self.store.borrow().get(&pointer) {
+                value.ne(old)
+            } else {
+                true
+            } {
+                self.store.borrow_mut().insert(pointer, value);
+                store(pointer.as_wa_ptr(), value.as_wa_ptr())
+            }
+        }
+    }
+
+    fn exists(&self, pointer: &StorageKey) -> bool {
+        if self.store.borrow().contains_key(pointer) {
             true
         } else {
             self.load(pointer).is_some()
         }
     }
 
-    fn store(&mut self, pointer: StorageKey, value: StorageValue) {
+    fn inputs(&self) -> alloc::vec::Vec<Input> {
         unsafe {
-            if if let Some(old) = self.store.get(&pointer) {
-                value.ne(old)
-            } else {
-                false
-            } {
-                self.store.insert(pointer, value);
-                store(pointer.ptr().0, value.ptr().0)
-            }
+            let size = inputs_size();
+            let mut buffer = Cursor::new(size as usize);
+            inputs(buffer.as_wa_mut_ptr());
+            buffer.read_transaction_inputs().unwrap()
         }
     }
 
-    fn inputs(&mut self) -> alloc::vec::Vec<crate::blockchain::transaction::Input> {
-        if let Some(inputs) = &self.inputs {
-            inputs.clone()
-        } else {
-            Vec::new()
+    fn outputs(&self) -> alloc::vec::Vec<Output> {
+        unsafe {
+            let size = outputs_size();
+            let mut buffer = Cursor::new(size as usize);
+            outputs(buffer.as_wa_mut_ptr());
+            buffer.read_transaction_outputs().unwrap()
         }
     }
-
-    /*
-    fn iter_inputs(&mut self) -> impl Iterator<Item = &crate::blockchain::transaction::Input> {
-        if self.inputs.is_none() {
-            self.inputs = Some(Vec::new());
-        }
-
-        self.inputs.as_ref().unwrap().iter()
-    }
-     */
-
-    fn outputs(&mut self) -> alloc::vec::Vec<crate::blockchain::transaction::Output> {
-        if let Some(outputs) = &self.outputs {
-            outputs.clone()
-        } else {
-            Vec::new()
-        }
-    }
-
-    /*
-    fn iter_outputs(&mut self) -> impl Iterator<Item = &crate::blockchain::transaction::Output> {
-        if self.outputs.is_none() {
-            self.outputs = Some(Vec::new());
-        }
-
-        self.outputs.as_ref().unwrap().iter()
-    }
-     */
 }
