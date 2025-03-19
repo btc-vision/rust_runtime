@@ -1,4 +1,8 @@
-use crate::WaBuffer;
+use core::alloc::Layout;
+
+use ::alloc::alloc::alloc;
+
+use crate::WaPtr;
 
 pub mod reader;
 pub mod writer;
@@ -9,7 +13,33 @@ pub struct Cursor {
     writer: usize,
 }
 
+impl Clone for Cursor {
+    fn clone(&self) -> Self {
+        Cursor::from_ptr(self.ptr(), self.inner.len())
+    }
+}
+
 impl Cursor {
+    pub fn new(size: usize) -> Cursor {
+        unsafe {
+            let layout = Layout::from_size_align_unchecked(size, 1);
+            Cursor {
+                inner: core::slice::from_raw_parts_mut(alloc(layout), size),
+                reader: 0,
+                writer: 0,
+            }
+        }
+    }
+
+    pub fn from_ptr(ptr: WaPtr, size: usize) -> Cursor {
+        unsafe {
+            Cursor {
+                inner: core::slice::from_raw_parts_mut(ptr.0 as *mut u8, size),
+                reader: 0,
+                writer: 0,
+            }
+        }
+    }
     pub fn from_slice(inner: &'static mut [u8]) -> Cursor {
         Cursor {
             reader: 0,
@@ -35,8 +65,12 @@ impl Cursor {
         self.writer = 0;
     }
 
-    pub fn get_buffer(&self) -> Result<WaBuffer, crate::error::Error> {
-        WaBuffer::from_bytes(self.inner)
+    pub fn ptr(&self) -> WaPtr {
+        WaPtr((self.inner.as_ptr()) as u32)
+    }
+
+    pub fn size(&self) -> usize {
+        self.inner.len()
     }
 }
 
@@ -50,18 +84,18 @@ mod tests {
         let mut cursor = super::Cursor::from_slice(alloc::boxed::Box::leak(mem));
 
         cursor.write_u8(1)?;
-        cursor.write_u16_le(&2)?;
-        cursor.write_u32_le(&3)?;
-        cursor.write_u64_le(&4)?;
-        cursor.write_u128_le(&5)?;
-        cursor.write_u256_be(&u256::new(6))?;
+        cursor.write_u16(&2, true)?;
+        cursor.write_u32(&3, true)?;
+        cursor.write_u64(&4, true)?;
+        cursor.write_u128(&5, true)?;
+        cursor.write_u256(&u256::new(6), true)?;
 
         assert_eq!(cursor.read_u8()?, 1);
-        assert_eq!(cursor.read_u16_le()?, 2);
-        assert_eq!(cursor.read_u32_le()?, 3);
-        assert_eq!(cursor.read_u64_le()?, 4);
-        assert_eq!(cursor.read_u128_le()?, 5);
-        assert_eq!(cursor.read_u256_be()?, u256::new(6));
+        assert_eq!(cursor.read_u16(true)?, 2);
+        assert_eq!(cursor.read_u32(true)?, 3);
+        assert_eq!(cursor.read_u64(true)?, 4);
+        assert_eq!(cursor.read_u128(true)?, 5);
+        assert_eq!(cursor.read_u256(true)?, u256::new(6));
 
         Ok(())
     }

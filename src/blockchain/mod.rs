@@ -6,4 +6,4 @@ pub mod transaction;
 pub use address::AddressHash;
 pub use block::BlockHash;
 pub use environment::Environment;
-pub use transaction::{Transaction, TransactionHash};
+pub use transaction::{Input, Output, Transaction, TransactionHash};

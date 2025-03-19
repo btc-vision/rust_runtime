@@ -15,9 +15,13 @@ pub enum Error {
     OnlyOwner,
     NoTokens,
     InsufficientAllowance,
+    ConvertError,
+    ParseError,
+    NoValidAddress,
 
     Test,
 
+    Revert(&'static str),
     Extra(&'static str),
 }
 
@@ -38,7 +42,13 @@ impl Error {
             Self::OnlyOwner => "OnlyOwner",
             Self::NoTokens => "NoTokens",
             Self::InsufficientAllowance => "InsufficientAllowance",
+            Self::ConvertError => "Convert error",
+            Self::ParseError => "ParseError",
+            Self::NoValidAddress => "NoValidAddress",
+
             Self::Test => "Test",
+
+            Self::Revert(err) => err,
             Self::Extra(err) => err,
         }
     }
@@ -46,6 +56,6 @@ impl Error {
 
 impl Debug for Error {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        f.debug_struct(&self.as_str()).finish()
+        f.debug_struct(self.as_str()).finish()
     }
 }

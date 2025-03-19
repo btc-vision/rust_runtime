@@ -18,25 +18,25 @@ pub const fn encode_selector_const(selector: &str) -> crate::types::Selector {
  */
 pub fn encode_selector(selector: &str) -> crate::types::Selector {
     super::bytes::bytes4(
-        crate::env::sha256(selector.as_bytes())
-            .unwrap()
+        crate::env::sha256(selector.as_bytes())[0..4]
             .try_into()
             .unwrap(),
     )
 }
 
 pub const fn encode_pointer_const(unique_identifier: u16) -> StorageKey {
-    let mut key = [0; crate::constant::STORE_KEY_SIZE];
+    let mut key = [0; crate::constant::STORE_KEY_BYTE_LENGTH];
     key[0] = (unique_identifier & 0xff) as u8;
     key[1] = ((unique_identifier >> 8) & 0xff) as u8;
-    key
+
+    StorageKey::new(key)
 }
 
 pub fn encode_pointer(unique_identifier: u16, typed: &[u8]) -> StorageKey {
     let hash = if typed.len() != 32 {
-        sha256(typed).unwrap()
+        sha256(typed)
     } else {
-        typed
+        typed.try_into().unwrap()
     };
 
     let mut final_pointer: [u8; 32] = [0; 32];
@@ -51,13 +51,5 @@ pub fn encode_pointer(unique_identifier: u16, typed: &[u8]) -> StorageKey {
      */
     final_pointer[2..32].copy_from_slice(&hash[..30]);
 
-    final_pointer
-}
-
-#[cfg(test)]
-mod tests {
-    #[test]
-    fn test_encode_selector() {
-        let selector = "Abi";
-    }
+    StorageKey::new(final_pointer)
 }

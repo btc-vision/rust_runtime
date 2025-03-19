@@ -3,11 +3,14 @@ use alloc::slice;
 use core::ptr::NonNull;
 use core::str::FromStr;
 
-use crate::cursor::Cursor; // Import format and String from alloc
+#[cfg(feature = "std")]
+use libc_print::std_name::println;
 
+use crate::cursor::Cursor; // Import format and String from alloc
+use crate::WaPtr;
 extern crate alloc;
 
-pub type WaPtr = u32;
+//pub type WaPtr = u32;
 
 pub struct WaCell {
     pub mm_info: u64,
@@ -15,11 +18,13 @@ pub struct WaCell {
     pub gc_info2: u64,
     pub rt_id: u32,
     pub rt_size: u32,
+    #[cfg(not(target_arch = "wasm32"))]
+    pub data: &'static mut [u8],
 }
 
 impl WaCell {
-    const fn size() -> WaPtr {
-        size_of::<Self>() as WaPtr
+    const fn size() -> u32 {
+        size_of::<Self>() as u32
     }
     const fn usize() -> usize {
         size_of::<Self>()
@@ -31,12 +36,18 @@ impl WaCell {
         unsafe {
             let layout = WaCell::layout(size);
             let ptr = alloc(layout);
+
             let cell = NonNull::<WaCell>::new_unchecked(ptr.cast()).as_mut();
 
             cell.gc_info1 = 0;
             cell.mm_info = ptr as u64;
             cell.rt_id = id;
             cell.rt_size = size as u32;
+            #[cfg(not(target_arch = "wasm32"))]
+            {
+                let data = alloc(Layout::from_size_align_unchecked(size, 1));
+                cell.data = core::slice::from_raw_parts_mut(data, size);
+            }
             cell
         }
     }
@@ -48,20 +59,37 @@ impl WaCell {
     }
 
     pub fn from_raw(ptr: WaPtr) -> &'static mut WaCell {
-        unsafe { NonNull::<WaCell>::new_unchecked((ptr - WaCell::size()) as *mut WaCell).as_mut() }
+        unsafe {
+            NonNull::<WaCell>::new_unchecked((ptr.0 - WaCell::size()) as *mut WaCell).as_mut()
+        }
     }
 
     #[inline]
     pub fn ptr(&self) -> WaPtr {
-        (self as *const Self as *const u8 as WaPtr) + WaCell::size()
+        WaPtr((self as *const Self as *const u8 as u32) + WaCell::size())
     }
 
+    #[cfg(target_arch = "wasm32")]
     pub fn data(&self) -> &'static [u8] {
-        unsafe { slice::from_raw_parts(self.ptr() as *const u8, self.rt_size as usize) }
+        #[cfg(target_arch = "wasm32")]
+        unsafe {
+            slice::from_raw_parts(self.ptr() as *const u8, self.rt_size as usize)
+        }
     }
 
+    #[cfg(not(target_arch = "wasm32"))]
+    pub fn data(&self) -> &'static [u8] {
+        unsafe { slice::from_raw_parts(self.data.as_ptr(), self.rt_size as usize) }
+    }
+
+    #[cfg(target_arch = "wasm32")]
     pub fn data_mut(&mut self) -> &'static mut [u8] {
         unsafe { slice::from_raw_parts_mut(self.ptr() as *mut u8, self.rt_size as usize) }
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    pub fn data_mut(&mut self) -> &'static mut [u8] {
+        unsafe { slice::from_raw_parts_mut(self.data.as_mut_ptr(), self.rt_size as usize) }
     }
 
     pub fn cursor(&mut self) -> super::cursor::Cursor {
@@ -88,8 +116,9 @@ impl WaBuffer {
         let buffer = WaCell::new(size, 1);
         let pointer = WaCell::new(12, id);
         let mut cursor = pointer.cursor();
-        cursor.write_u32_le(&buffer.ptr())?;
-        cursor.write_u32_le(&buffer.ptr())?;
+
+        cursor.write_u32_le(&buffer.ptr().0)?;
+        cursor.write_u32_le(&buffer.ptr().0)?;
         cursor.write_u32_le(&(size as u32))?;
         Ok(WaBuffer { pointer, buffer })
     }
@@ -97,8 +126,9 @@ impl WaBuffer {
         let buffer = WaCell::new_data(1, bytes);
         let pointer = WaCell::new(12, 2);
         let mut cursor = pointer.cursor();
-        cursor.write_u32_le(&buffer.ptr())?;
-        cursor.write_u32_le(&buffer.ptr())?;
+
+        cursor.write_u32_le(&buffer.ptr().0)?;
+        cursor.write_u32_le(&buffer.ptr().0)?;
         cursor.write_u32_le(&(bytes.len() as u32))?;
         Ok(WaBuffer { pointer, buffer })
     }
@@ -106,7 +136,7 @@ impl WaBuffer {
         let pointer = WaCell::from_raw(ptr);
         let mut cursor = pointer.cursor();
         let buffer_ptr = cursor.read_u32_le_unchecked();
-        let buffer = WaCell::from_raw(buffer_ptr);
+        let buffer = WaCell::from_raw(WaPtr(buffer_ptr));
         WaBuffer { pointer, buffer }
     }
 

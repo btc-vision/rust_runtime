@@ -2,11 +2,13 @@
 extern crate alloc;
 
 #[allow(unused_imports)]
-use rust_runtime::prelude::{ContractTrait, WaBuffer, WaPtr};
-pub mod contract;
+use alloc::rc::Rc;
 
-#[allow(dead_code, static_mut_refs)]
-static mut CONTRACT: contract::Contract = contract::Contract::new();
+#[allow(unused_imports)]
+use core::cell::RefCell;
+
+#[allow(unused_imports)]
+pub mod contract;
 
 #[cfg(target_arch = "wasm32")]
 use lol_alloc::LeakingPageAllocator;
@@ -16,30 +18,13 @@ use lol_alloc::LeakingPageAllocator;
 static ALLOCATOR: LeakingPageAllocator = LeakingPageAllocator;
 
 #[cfg(target_arch = "wasm32")]
-#[allow(static_mut_refs)]
-#[export_name = "execute"]
-pub unsafe fn execute(ptr: WaPtr) -> WaPtr {
-    match CONTRACT.execute(WaBuffer::from_raw(ptr).cursor()) {
-        Ok(buffer) => buffer.ptr(),
-        Err(err) => {
-            rust_runtime::log(err.as_str());
-            panic!("Error occured")
-        }
-    }
-}
+#[export_name = "start"]
+pub unsafe fn start() {
+    use rust_runtime::env::global::GlobalContext;
+    use rust_runtime::Context;
+    let context = Rc::new(GlobalContext::new());
 
-#[cfg(target_arch = "wasm32")]
-#[export_name = "onDeploy"]
-#[allow(static_mut_refs)]
-pub unsafe fn on_deploy(ptr: WaPtr) {
-    CONTRACT.on_deploy(WaBuffer::from_raw(ptr).cursor());
-}
-
-#[cfg(target_arch = "wasm32")]
-#[export_name = "setEnvironment"]
-#[allow(static_mut_refs)]
-pub unsafe fn set_environment(ptr: WaPtr) {
-    let buffer = WaBuffer::from_raw(ptr);
-    let environment: &mut rust_runtime::blockchain::Environment = buffer.into_type();
-    CONTRACT.set_environment(environment);
+    rust_runtime::CONTRACT = Some(Rc::new(RefCell::new(crate::contract::Contract::new(
+        context,
+    ))));
 }

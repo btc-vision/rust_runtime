@@ -2,6 +2,7 @@
 //!
 
 /// Map structure
+#[derive(Clone)]
 pub struct Map<Key, Value>
 where
     Key: Sized + Eq,

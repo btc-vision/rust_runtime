@@ -1,6 +1,9 @@
 #[allow(unused_imports)]
 use crate::WaBuffer;
 
+#[allow(unused_imports)]
+use ripemd::{Digest, Ripemd160};
+
 #[cfg(target_arch = "wasm32")]
 pub fn sha256(bytes: &[u8]) -> Result<&'static [u8], crate::error::Error> {
     unsafe {
@@ -29,6 +32,26 @@ pub fn sha256_double(bytes: &[u8]) -> Result<&'static [u8], crate::error::Error>
     Ok(alloc::boxed::Box::leak(alloc::boxed::Box::new(second)))
 }
 
+#[cfg(target_arch = "wasm32")]
+pub fn rimemd160(bytes: &[u8]) -> Result<&'static [u8], crate::error::Error> {
+    unsafe {
+        Ok(WaBuffer::from_raw(super::global::rimemd160(WaBuffer::from_bytes(bytes)?.ptr())).data())
+    }
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+pub fn rimemd160(data: &[u8]) -> Result<&'static [u8], crate::error::Error> {
+    use ripemd::digest::crypto_common::KeyInit;
+
+    let mut hasher = ripemd::Ripemd160::new();
+    hasher.update(data);
+    let hash = hasher.finalize();
+
+    Ok(alloc::boxed::Box::leak(alloc::boxed::Box::new(
+        hash.to_vec(),
+    )))
+}
+
 #[cfg(test)]
 mod tests {
     #[test]
@@ -50,6 +73,15 @@ mod tests {
             alloc::string::String::from(
                 "0xf6dc724d119649460e47ce719139e521e082be8a9755c5bece181de046ee65fe"
             )
+        );
+    }
+
+    #[test]
+    fn test_ripemd160() {
+        let text = "Hello world";
+        assert_eq!(
+            crate::utils::to_hex(super::rimemd160(text.as_bytes()).unwrap()),
+            alloc::string::String::from("0xdbea7bd24eef40a2e79387542e36dd408b77b21a")
         );
     }
 }
